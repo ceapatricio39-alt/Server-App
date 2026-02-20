@@ -1237,6 +1237,29 @@
       { name: "Helipuerto Militar (Admin)", desc: "Zona segura e indestructible. Solo Admin.", width: 300, height: 300, color: "rgba(239, 68, 68, 0.15)", borderColor: "#ef4444", priceGame: 0, priceReal: 0, reqAdmin: true }
     ];
 
+    // ── API ───────────────────────────────────────────
+    let authToken = null;
+
+    async function apiPost(url, body) {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { 'Authorization': 'Bearer ' + authToken } : {})
+        },
+        body: JSON.stringify(body)
+      });
+      return res.json();
+    }
+
+    async function apiGet(url) {
+      const res = await fetch(url, {
+        headers: authToken ? { 'Authorization': 'Bearer ' + authToken } : {}
+      });
+      return res.json();
+    }
+    // ─────────────────────────────────────────────────
+
     let isLoginMode = true;
     let currentUser = null;
     let isAdmin = false;
@@ -1248,21 +1271,27 @@
       document.getElementById('login-toggle-text').innerText = isLoginMode ? '¿No tienes cuenta? Regístrate aquí' : '¿Ya tienes cuenta? Inicia sesión';
     }
 
-    function handleAuth() {
+    async function handleAuth() {
       const user = document.getElementById('login-user').value.trim();
       const pass = document.getElementById('login-pass').value.trim();
       if (!user || !pass) { alert("Por favor completa usuario y contraseña."); return; }
 
-      let users = JSON.parse(localStorage.getItem('baseUsers')) || {};
+      const loginBtn = document.getElementById('login-btn');
+      loginBtn.innerText = '...';
+      loginBtn.disabled = true;
 
       if (isLoginMode) {
-        if (user === 'admin' && pass === 'admin123') { completeLogin(user, true); return; }
-        if (users[user] && users[user] === pass) { completeLogin(user, false); }
-        else { alert("Credenciales incorrectas."); }
+        const data = await apiPost('/api/login', { username: user, password: pass });
+        loginBtn.innerText = 'Entrar'; loginBtn.disabled = false;
+        if (data.error) { alert(data.error); return; }
+        authToken = data.token;
+        completeLogin(data.username, data.isAdmin);
       } else {
-        if (user.toLowerCase() === 'admin') { alert("El nombre de usuario 'admin' está reservado."); return; }
-        if (users[user]) { alert("El usuario ya existe. Por favor utiliza otro nombre o inicia sesión."); }
-        else { users[user] = pass; localStorage.setItem('baseUsers', JSON.stringify(users)); alert("Cuenta creada con éxito. Ahora puedes iniciar sesión."); toggleAuthMode(); }
+        const data = await apiPost('/api/register', { username: user, password: pass });
+        loginBtn.innerText = 'Crear Cuenta'; loginBtn.disabled = false;
+        if (data.error) { alert(data.error); return; }
+        alert("¡Cuenta creada! Ahora inicia sesión.");
+        toggleAuthMode();
       }
     }
 
@@ -1286,7 +1315,7 @@
       }
     }
 
-    let customBuildings = JSON.parse(localStorage.getItem('customBuildings') || '[]');
+    let customBuildings = [];
 
     function showItemCreator() { document.getElementById('creator-panel').style.display = 'flex'; }
     function closeItemCreator() { document.getElementById('creator-panel').style.display = 'none'; }
@@ -1311,7 +1340,6 @@
       };
 
       customBuildings.push(newItem);
-      localStorage.setItem('customBuildings', JSON.stringify(customBuildings));
       alert("¡Edificio '" + name + "' creado y añadido al catálogo!");
       closeItemCreator();
       updateBuildingUI();
@@ -1341,59 +1369,71 @@
       historyManager = [];
     }
 
-    function saveMyBase() {
-      if (!currentUser) { alert("Primero debes iniciar sesión para guardar tu base."); return; }
+    async function saveMyBase() {
+      if (!currentUser) { alert("Primero debes iniciar sesión."); return; }
+      const btn = event?.target;
+      if (btn) { btn.innerText = '💾 Guardando...'; btn.disabled = true; }
       const state = captureBaseState();
-      localStorage.setItem('savedBase_' + currentUser, JSON.stringify(state));
-      alert("¡Base guardada con éxito en tu cuenta local!");
+      const res = await apiPost('/api/build/save', { data: state });
+      if (btn) { btn.innerText = '💾 Guardar'; btn.disabled = false; }
+      if (res.ok) alert("¡Base guardada en la nube!");
+      else alert("Error al guardar.");
     }
 
-    function loadMyBase() {
-      if (!currentUser) { alert("Primero debes iniciar sesión para cargar tu base."); return; }
-      const dataStr = localStorage.getItem('savedBase_' + currentUser);
-      if (dataStr) {
-        if (confirm("Al cargar tu base sobreescribirás lo que estás haciendo ahora. ¿Continuar?")) {
-          restoreBaseState(JSON.parse(dataStr));
+    async function loadMyBase() {
+      if (!currentUser) { alert("Primero debes iniciar sesión."); return; }
+      const data = await apiGet('/api/build/load');
+      if (data && data.htmls) {
+        if (confirm("¿Cargar tu base guardada? Se perderá lo actual.")) {
+          restoreBaseState(data);
         }
       } else { alert("No tienes ninguna base guardada."); }
     }
 
-    function sendBase() {
-      if (!currentUser) { alert("Primero debes iniciar sesión para enviar tu base."); return; }
+    async function sendBase() {
+      if (!currentUser) { alert("Primero debes iniciar sesión."); return; }
       if (totalGame === 0 && totalReal === 0) { alert("No puedes enviar una base vacía."); return; }
       if (confirm("¿Estás seguro de enviar esta base a revisión?")) {
         const state = captureBaseState();
-        let submissions = JSON.parse(localStorage.getItem('baseSubmissions') || '[]');
-        submissions.push({ user: currentUser, totalGame, totalReal: (Math.round(totalReal * 10) / 10).toFixed(1), date: new Date().toLocaleString(), state });
-        localStorage.setItem('baseSubmissions', JSON.stringify(submissions));
-        alert("¡Base enviada exitosamente al equipo de Admin!");
+        const res = await apiPost('/api/submit', {
+          totalGame,
+          totalReal: parseFloat((Math.round(totalReal * 10) / 10).toFixed(1)),
+          data: state
+        });
+        if (res.ok) alert("¡Base enviada al equipo de Admin!");
+        else alert("Error al enviar.");
       }
     }
 
-    function showAdminPanel() {
+    async function showAdminPanel() {
       const tbody = document.getElementById('admin-tbody');
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Cargando...</td></tr>';
+      document.getElementById('admin-panel').style.display = 'flex';
+
+      const subs = await apiGet('/api/submissions');
       tbody.innerHTML = '';
-      let submissions = JSON.parse(localStorage.getItem('baseSubmissions') || '[]');
-      if (submissions.length === 0) {
+
+      if (!Array.isArray(subs) || subs.length === 0) {
         tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">No hay bases enviadas.</td></tr>';
       } else {
-        submissions.forEach((sub, idx) => {
+        subs.forEach((sub, idx) => {
           let tr = document.createElement('tr');
-          tr.innerHTML = `<td>@${sub.user}</td><td>💰 ${Math.round(sub.totalGame)} | 💵 ${sub.totalReal}</td><td>${sub.date}</td><td><button class="view-btn" onclick="viewSubmittedBase(${idx})">Abrir/Inspeccionar</button></td>`;
+          tr.innerHTML = `<td>@${sub.username}</td><td>💰 ${Math.round(sub.totalGame)} | 💵 ${sub.totalReal}</td><td>${new Date(sub.createdAt).toLocaleString()}</td><td><button class="view-btn" onclick="viewSubmittedBase(${idx})">Abrir/Inspeccionar</button></td>`;
           tbody.appendChild(tr);
         });
+        // Guardar submissions en memoria para viewSubmittedBase
+        window._adminSubs = subs;
       }
-      document.getElementById('admin-panel').style.display = 'flex';
     }
 
     function closeAdminPanel() { document.getElementById('admin-panel').style.display = 'none'; }
 
     window.viewSubmittedBase = function(index) {
-      let submissions = JSON.parse(localStorage.getItem('baseSubmissions') || '[]');
-      const sub = submissions[index];
-      if (sub && confirm("Abrir esta base limpiará tu diseño actual. ¿Deseas ver la base de @" + sub.user + "?")) {
+      const subs = window._adminSubs || [];
+      const sub = subs[index];
+      if (sub && confirm("¿Ver la base de @" + sub.username + "? Se perderá lo actual.")) {
         closeAdminPanel();
-        restoreBaseState(sub.state);
+        restoreBaseState(sub.data);
       }
     }
 
