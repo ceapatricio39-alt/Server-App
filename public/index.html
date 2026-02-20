@@ -1,0 +1,2355 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>DayZ Base Planner</title>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap');
+
+    :root {
+      --bg-color: #0b1120;
+      --panel-bg: rgba(15, 23, 42, 0.75);
+      --border-color: rgba(255, 255, 255, 0.1);
+      --accent-color: #6366f1;
+      --accent-hover: #818cf8;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --map-bg: #0f172a;
+      --grid-color: rgba(255, 255, 255, 0.07);
+    }
+
+    body {
+      margin: 0;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      font-family: 'Outfit', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow-x: hidden;
+    }
+
+    .pc-only { display: none !important; }
+    .mobile-only { display: none !important; }
+    body.is-pc .pc-only { display: flex !important; }
+    body.is-mobile .mobile-only { display: flex !important; }
+
+    #ui {
+      background: var(--panel-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      z-index: 1000;
+      transition: all 0.3s ease;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+    }
+
+    body.is-pc #ui {
+      position: relative;
+      width: 100%;
+      max-width: 100vw;
+      box-sizing: border-box;
+      padding: 10px 15px;
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 15px;
+      align-items: center;
+      justify-content: flex-start;
+      border-radius: 0;
+      border: none;
+      border-bottom: 1px solid var(--border-color);
+      transform: none;
+      left: auto;
+      top: auto;
+    }
+
+    body.is-pc .floating-palette,
+    body.is-pc .mobile-only { display: none !important; }
+
+    body.is-mobile #ui {
+      position: fixed;
+      top: 15px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: clamp(300px, 90%, 600px);
+      padding: 10px 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      border-radius: 16px;
+    }
+
+    #ui div {
+      font-weight: 300;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0, 0, 0, 0.2);
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+    }
+
+    #ui span {
+      font-weight: 600;
+      color: var(--text-main);
+      font-size: 1.1rem;
+    }
+
+    button {
+      background: var(--accent-color);
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+
+    button:hover {
+      background: var(--accent-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+    }
+
+    button:active { transform: translateY(0); }
+
+    button.outline {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      box-shadow: none;
+      color: var(--text-main);
+    }
+
+    button.outline:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    #map-viewport {
+      background-color: transparent;
+      transition: all 0.3s ease;
+    }
+
+    body.is-pc #map-viewport {
+      width: 100%;
+      height: auto;
+      min-height: 80vh;
+      overflow: visible;
+      position: relative;
+      display: flex;
+      justify-content: center;
+      padding: 40px 0;
+    }
+
+    body.is-pc #map {
+      width: 800px;
+      height: 800px;
+      position: relative;
+      background-color: var(--map-bg);
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+      transform: none !important;
+    }
+
+    body.is-mobile #map-viewport {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      position: fixed;
+      top: 0;
+      left: 0;
+      background-color: #040712;
+      cursor: crosshair;
+      touch-action: none;
+      display: block;
+      padding: 0;
+    }
+
+    body.is-mobile #map {
+      width: 800px;
+      height: 800px;
+      position: absolute;
+      top: 0;
+      left: 0;
+      background-color: var(--map-bg);
+      transform-origin: 0 0;
+    }
+
+    .grid {
+      background-image: radial-gradient(var(--grid-color) 1px, transparent 1px);
+      background-size: 10px 10px;
+      background-position: center center;
+      box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6), inset 0 0 80px rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .building {
+      box-sizing: border-box;
+      position: absolute;
+      cursor: grab;
+      border-radius: 8px;
+      border-style: solid;
+      border-width: 2px;
+      box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.05), 0 5px 15px rgba(0, 0, 0, 0.4);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+      user-select: none;
+      transition: filter 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+      overflow: visible;
+      white-space: nowrap;
+      animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+
+    .measure-label {
+      position: absolute;
+      background: rgba(15, 23, 42, 0.95);
+      color: #fff;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      pointer-events: none;
+      white-space: nowrap;
+      z-index: 10;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.5);
+    }
+
+    @keyframes popIn {
+      0% { scale: 0.5; opacity: 0; }
+      100% { scale: 1; opacity: 1; }
+    }
+
+    .building:active {
+      cursor: grabbing;
+      scale: 1.02;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+      z-index: 100;
+    }
+
+    body.mode-delete .building { cursor: no-drop; }
+    body.mode-delete .building:active {
+      scale: 0.95;
+      background: rgba(239, 68, 68, 0.5) !important;
+      border-color: #ef4444 !important;
+    }
+
+    body.mode-build .building:not(.preview) { pointer-events: none; }
+    body.mode-move .building:not(.preview) { cursor: move; }
+    body.mode-move .building:not(.preview):active { cursor: grabbing; }
+
+    .invalid {
+      background: rgba(239, 68, 68, 0.2) !important;
+      border-color: #ef4444 !important;
+      box-shadow: inset 0 0 20px rgba(239, 68, 68, 0.3) !important;
+    }
+
+    .preview {
+      opacity: 0.7;
+      pointer-events: none;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 0.6; }
+      50% { opacity: 0.8; }
+      100% { opacity: 0.6; }
+    }
+
+    .app-title {
+      font-size: 1.2rem;
+      font-weight: 600;
+      margin-right: auto;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .app-title::before {
+      content: '🏕️';
+      font-size: 1.5rem;
+    }
+
+    .building-selector {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(0, 0, 0, 0.2);
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+    }
+
+    .arrow-btn {
+      background: transparent;
+      color: var(--text-main);
+      box-shadow: none;
+      padding: 5px 8px;
+      font-size: 1.2rem;
+    }
+
+    .arrow-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      box-shadow: none;
+      transform: scale(1.1);
+    }
+
+    .building-info {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 180px;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+
+    .building-info.fade-out { opacity: 0; transform: translateY(-10px); }
+    .building-info.fade-in { opacity: 1; transform: translateY(0); }
+
+    .tool-btn { display: flex; align-items: center; gap: 6px; }
+    .tool-btn.active { background: var(--text-main); color: var(--bg-color); }
+
+    .building-name { font-weight: 600; font-size: 1rem; }
+    .building-desc { font-size: 0.75rem; color: var(--text-muted); text-align: center; margin-bottom: 3px; }
+    .building-price { font-size: 0.8rem; color: #fbbf24; font-weight: 600; }
+
+    #selector-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      width: 100%;
+    }
+
+    .mobile-selector-handle {
+      width: 50px;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 2px;
+      margin: 5px 0 10px 0;
+      cursor: pointer;
+      display: none;
+    }
+
+    body.is-mobile .mobile-selector-handle { display: block; }
+
+    body.is-mobile #selector-container.collapsed {
+      height: 20px;
+      overflow: hidden;
+      opacity: 0.5;
+    }
+
+    body.is-mobile #selector-container.collapsed .building-selector {
+      pointer-events: none;
+      transform: translateY(10px);
+      opacity: 0;
+      height: 0;
+      margin: 0;
+    }
+
+    body.is-mobile #ui.is-collapsed {
+      padding: 5px 10px !important;
+      gap: 0 !important;
+      min-height: 30px;
+    }
+
+    body.is-mobile #ui.is-collapsed .app-title {
+      font-size: 0 !important;
+      gap: 0 !important;
+      margin: 0 !important;
+      justify-content: center;
+    }
+
+    body.is-mobile #ui.is-collapsed .app-title::before { display: none !important; }
+
+    body.is-mobile #ui.is-collapsed #user-badge {
+      font-size: 0.7rem !important;
+      margin: 0 auto !important;
+      display: block !important;
+    }
+
+    body.is-mobile #ui.is-collapsed #admin-badge { display: none !important; }
+    body.is-mobile #ui.is-collapsed .mobile-selector-handle { margin: 2px 0 5px 0; }
+    body.is-mobile #ui:not(.is-collapsed)~.floating-palette { display: none !important; }
+
+    #zoom-controls {
+      top: 140px !important;
+      right: 20px !important;
+      left: auto !important;
+      transform: none !important;
+    }
+
+    .stat-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .stat-value { color: #fbbf24; font-weight: 600; }
+
+    .smart-guide {
+      position: absolute;
+      background-color: #0ea5e9;
+      box-shadow: 0 0 5px #0ea5e9;
+      pointer-events: none;
+      display: none;
+      z-index: 50;
+    }
+
+    .smart-guide.vertical { width: 1px; }
+    .smart-guide.horizontal { height: 1px; }
+
+    .guide-label {
+      position: absolute;
+      background: #0ea5e9;
+      color: #fff;
+      font-size: 10px;
+      padding: 1px 4px;
+      border-radius: 4px;
+      font-weight: 600;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    .smart-guide.vertical .guide-label { left: 4px; top: 50%; transform: translateY(-50%); }
+    .smart-guide.horizontal .guide-label { bottom: 4px; left: 50%; transform: translateX(-50%); }
+
+    #confirm-place-btn {
+      position: fixed;
+      bottom: 100px;
+      left: 50%;
+      transform: translateX(-50%) scale(0.7);
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: #22c55e;
+      border: 3px solid #fff;
+      color: white;
+      font-size: 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 32px rgba(34, 197, 94, 0.6);
+      cursor: pointer;
+      z-index: 3000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      padding: 0;
+    }
+
+    #confirm-place-btn.visible {
+      opacity: 1;
+      pointer-events: all;
+      transform: translateX(-50%) scale(1);
+      animation: confirmPulse 1.8s ease-in-out infinite;
+    }
+
+    #confirm-place-btn.invalid-state {
+      background: #475569;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+      animation: none;
+      pointer-events: none;
+      opacity: 0.5;
+    }
+
+    @keyframes confirmPulse {
+      0%, 100% { box-shadow: 0 8px 32px rgba(34, 197, 94, 0.6), 0 0 0 0 rgba(34, 197, 94, 0.4); }
+      50% { box-shadow: 0 8px 32px rgba(34, 197, 94, 0.8), 0 0 0 14px rgba(34, 197, 94, 0); }
+    }
+
+    .wall-start-dot {
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #fbbf24;
+      border: 2px solid #fff;
+      box-shadow: 0 0 10px rgba(251, 191, 36, 0.8), 0 0 20px rgba(251, 191, 36, 0.4);
+      pointer-events: none;
+      z-index: 200;
+      transform: translate(-50%, -50%);
+      animation: dotPulse 1s ease-in-out infinite;
+    }
+
+    @keyframes dotPulse {
+      0%, 100% { box-shadow: 0 0 10px rgba(251, 191, 36, 0.8), 0 0 20px rgba(251, 191, 36, 0.4); transform: translate(-50%, -50%) scale(1); }
+      50% { box-shadow: 0 0 15px rgba(251, 191, 36, 1), 0 0 30px rgba(251, 191, 36, 0.6); transform: translate(-50%, -50%) scale(1.3); }
+    }
+
+    #wall-toast {
+      position: fixed;
+      bottom: 100px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid #fbbf24;
+      color: #fbbf24;
+      padding: 10px 20px;
+      border-radius: 12px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      pointer-events: none;
+      z-index: 2000;
+      opacity: 0;
+      transition: all 0.3s ease;
+      white-space: nowrap;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+
+    #wall-toast.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    #login-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: var(--bg-color);
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    .login-box {
+      background: var(--panel-bg);
+      padding: 40px;
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+      width: 320px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .login-box h2 { margin: 0 0 10px 0; text-align: center; }
+    .login-box input {
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+      background: rgba(0, 0, 0, 0.2);
+      color: white;
+      font-family: 'Outfit', sans-serif;
+      outline: none;
+    }
+
+    .login-box button {
+      padding: 10px;
+      border-radius: 6px;
+      background: var(--accent-color);
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      transition: 0.2s;
+    }
+
+    .login-box button:hover { background: var(--accent-hover); }
+
+    .login-toggle {
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    .login-toggle:hover { color: white; text-decoration: underline; }
+
+    .admin-badge {
+      background: #ef4444;
+      color: white;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: bold;
+      margin-left: 10px;
+      display: none;
+    }
+
+    .user-badge { font-size: 0.8rem; color: #38bdf8; margin-left: 10px; }
+
+    #admin-panel {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 10000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(10px);
+    }
+
+    .admin-box {
+      background: var(--panel-bg);
+      padding: 30px;
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+      width: 600px;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+    }
+
+    .admin-box h2 { margin-top: 0; display: flex; justify-content: space-between; align-items: center; }
+    .close-btn { background: transparent; border: none; color: white; font-size: 1.5rem; cursor: pointer; }
+
+    .admin-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    .admin-table th, .admin-table td { padding: 10px; border: 1px solid var(--border-color); text-align: left; }
+    .admin-table th { background: rgba(255, 255, 255, 0.05); }
+
+    .view-btn { background: var(--accent-color); color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; }
+
+    .floating-palette {
+      position: fixed;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 1000;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    #construction-tools { left: 20px; bottom: 20px; }
+    #system-tools { right: 20px; bottom: 20px; }
+
+    .circle-btn {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: var(--panel-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-color);
+      color: white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 1.4rem;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      padding: 0;
+      position: relative;
+    }
+
+    .circle-btn:hover {
+      background: var(--accent-color);
+      transform: scale(1.1);
+      box-shadow: 0 12px 40px rgba(99, 102, 241, 0.4);
+    }
+
+    .circle-btn.active { background: var(--accent-color); border-color: #fff; }
+
+    .circle-btn.danger:hover {
+      background: #ef4444;
+      box-shadow: 0 12px 40px rgba(239, 68, 68, 0.4);
+    }
+
+    .btn-toggle { background: var(--accent-hover); font-size: 1rem; font-weight: bold; }
+
+    .palette-content {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 8px;
+      margin: -8px;
+      overflow: visible;
+      max-height: 516px;
+      transition: max-height 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
+    }
+
+    .palette-content.hidden {
+      max-height: 0;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(20px);
+      padding-top: 0;
+      padding-bottom: 0;
+    }
+
+    .circle-btn.active {
+      background: var(--accent-color);
+      border-color: #fff;
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.5), 0 8px 24px rgba(99, 102, 241, 0.6);
+    }
+
+    #mobile-actions {
+      position: fixed;
+      left: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 1000;
+    }
+
+    @media (max-width: 768px) {
+      #ui { flex-direction: column; height: auto; padding: 10px; gap: 15px; align-items: center; }
+      .app-title { font-size: 1.1rem !important; margin-bottom: 5px; }
+      .building-selector { width: 100%; max-width: 400px; transform: none; margin: 0; justify-content: space-between; padding: 10px 15px; }
+      .arrow-btn { padding: 10px 15px !important; font-size: 1.5rem !important; }
+      .building-name { font-size: 1.1rem !important; }
+      .building-desc { font-size: 0.85rem !important; }
+      .building-info { flex: 1; min-width: 0; }
+      .tool-group { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; border-left: none !important; padding-left: 0 !important; border-top: 1px solid var(--border-color); padding-top: 15px; width: 100%; }
+      .tool-btn { padding: 12px 16px !important; font-size: 0.9rem !important; min-width: 80px; }
+      #right-toolbar { right: 15px; bottom: 30px; top: auto; transform: none; flex-direction: row; padding: 8px; border-radius: 25px; }
+      #right-toolbar button { width: 48px; height: 48px; border-radius: 50%; font-size: 1.1rem; }
+      .login-box, .creator-box, .admin-box { width: 90% !important; max-width: 350px; padding: 25px !important; }
+    }
+
+    #creator-panel {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.85);
+      z-index: 10001;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(15px);
+    }
+
+    .creator-box {
+      background: var(--panel-bg);
+      padding: 30px;
+      border-radius: 16px;
+      border: 1px solid var(--border-color);
+      width: 400px;
+      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.6);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .creator-box h2 { margin: 0 0 10px 0; text-align: center; }
+
+    .creator-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .creator-box label { font-size: 0.8rem; color: var(--text-muted); }
+    .creator-box input, .creator-box select { padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0, 0, 0, 0.3); color: white; outline: none; }
+    .creator-box .full-width { grid-column: span 2; }
+
+    .creator-actions { display: flex; gap: 10px; margin-top: 10px; }
+    .creator-actions button { flex: 1; padding: 10px; border-radius: 6px; cursor: pointer; border: none; font-weight: 600; }
+    .btn-save-item { background: var(--accent-color); color: white; }
+    .btn-cancel-item { background: rgba(255, 255, 255, 0.1); color: white; }
+  </style>
+</head>
+
+<body>
+
+  <div id="wall-toast">📍 Ahora toca para poner el punto final del muro</div>
+  <button id="confirm-place-btn" onclick="confirmPlacement()">✓</button>
+
+  <div id="login-screen">
+    <div class="login-box">
+      <h2 id="login-title">Iniciar Sesión</h2>
+      <input type="text" id="login-user" placeholder="Usuario">
+      <input type="password" id="login-pass" placeholder="Contraseña">
+      <button onclick="handleAuth()" id="login-btn">Entrar</button>
+      <div class="login-toggle" onclick="toggleAuthMode()" id="login-toggle-text">¿No tienes cuenta? Regístrate aquí</div>
+    </div>
+  </div>
+
+  <div id="admin-panel">
+    <div class="admin-box">
+      <h2>Bases Enviadas <button class="close-btn" onclick="closeAdminPanel()">×</button></h2>
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Usuario</th>
+            <th>Costo Total</th>
+            <th>Fecha</th>
+            <th>Acción</th>
+          </tr>
+        </thead>
+        <tbody id="admin-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="stats-panel">
+    <div class="stat-item">Ingame: <span id="totalGame" class="stat-value">0</span></div>
+    <div class="stat-item">Real: <span id="totalReal" class="stat-value">0.0</span></div>
+  </div>
+
+  <div id="ui">
+    <div class="app-title">DayZ Base Planner <span id="admin-badge" class="admin-badge">ADMIN</span> <span id="user-badge" class="user-badge"></span></div>
+
+    <div id="selector-container">
+      <div class="mobile-selector-handle mobile-only" onclick="toggleMobileSelector()"></div>
+      <div class="building-selector">
+        <button class="arrow-btn" onclick="prevBuilding()">◄</button>
+        <div class="building-info" id="b-info-container">
+          <div class="building-name" id="b-name">...</div>
+          <div class="building-desc" id="b-desc">...</div>
+          <div class="building-price" id="b-price">...</div>
+        </div>
+        <button class="arrow-btn" onclick="nextBuilding()">►</button>
+      </div>
+    </div>
+
+    <button class="outline pc-only" onclick="toggleGrid()">Alternar Cuadrícula</button>
+
+    <div class="tool-group pc-only">
+      <button class="outline tool-btn active" id="pc-btn-build" onclick="setMode('build')">🔨 Construir</button>
+      <button class="outline tool-btn" id="pc-btn-move" onclick="setMode('move')">✋ Mover</button>
+      <button class="outline tool-btn" id="pc-btn-delete" onclick="setMode('delete')">🗑️ Borrar</button>
+      <button class="outline tool-btn" onclick="undoLastAction()">↩️ Deshacer</button>
+      <button class="outline tool-btn" id="pc-btn-clear" onclick="clearAll()" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.3);">💣 Todo</button>
+    </div>
+
+    <div class="pc-only" style="display: flex; gap: 10px; border-left: 1px solid var(--border-color); padding-left: 20px;">
+      <button class="outline tool-btn" onclick="saveMyBase()">💾 Guardar</button>
+      <button class="outline tool-btn" onclick="loadMyBase()">📂 Cargar</button>
+      <button class="outline tool-btn" onclick="sendBase()" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.3);">🚀 Enviar</button>
+      <button class="outline tool-btn" id="pc-btn-admin-panel" onclick="showAdminPanel()" style="display:none; color: #ef4444; border-color: rgba(239, 68, 68, 0.3);">⚙️ Admin</button>
+      <button class="outline tool-btn" id="pc-btn-item-creator" onclick="showItemCreator()" style="display:none; color: #10b981; border-color: rgba(16, 185, 129, 0.3);">⚒️ Crear</button>
+    </div>
+  </div>
+
+  <div id="construction-tools" class="floating-palette mobile-only">
+    <div id="build-palette-content" class="palette-content">
+      <button class="circle-btn active" id="btn-build" onclick="setMode('build')" title="Construir (B)">🔨</button>
+      <button class="circle-btn" id="btn-move" onclick="setMode('move')" title="Mover (M)">✋</button>
+      <button class="circle-btn" id="btn-delete" onclick="setMode('delete')" title="Borrar (D)">🗑️</button>
+      <button class="circle-btn" onclick="rotateMobile()" title="Rotar (R)">🔄</button>
+      <button class="circle-btn" onclick="undoLastAction()" title="Deshacer (Ctrl+Z)">↩️</button>
+      <button class="circle-btn danger" id="btn-clear" onclick="clearAll()" title="Borrar Todo">💣</button>
+    </div>
+    <button class="circle-btn btn-toggle" onclick="togglePalette('build-palette-content')">⚒️</button>
+  </div>
+
+  <div id="system-tools" class="floating-palette mobile-only">
+    <div id="system-palette-content" class="palette-content">
+      <button class="circle-btn" onclick="saveMyBase()" title="Guardar">💾</button>
+      <button class="circle-btn" onclick="loadMyBase()" title="Cargar">📂</button>
+      <button class="circle-btn" onclick="sendBase()" title="Enviar" style="color: #38bdf8;">🚀</button>
+      <button class="circle-btn" id="btn-admin-panel" onclick="showAdminPanel()" style="display:none; color: #ef4444;">⚙️</button>
+      <button class="circle-btn" id="btn-item-creator" onclick="showItemCreator()" style="display:none; color: #10b981;">⚒️</button>
+    </div>
+    <button class="circle-btn btn-toggle" onclick="togglePalette('system-palette-content')">💾</button>
+  </div>
+
+  <div id="zoom-controls" class="floating-palette mobile-only" style="left: 20px; top: 35%; transform: translateY(-50%);">
+    <button class="circle-btn" onclick="changeZoom(0.1)" title="Zoom In">+</button>
+    <button class="circle-btn" onclick="changeZoom(-0.1)" title="Zoom Out">-</button>
+    <button class="circle-btn" onclick="resetZoom()" title="Reset Zoom" style="font-size: 0.8rem;">1:1</button>
+  </div>
+
+  <div id="creator-panel">
+    <div class="creator-box">
+      <h2>Nuevo Edificio</h2>
+      <label>Nombre</label>
+      <input type="text" id="c-name" placeholder="Ej: Torre Gigante" class="full-width">
+      <label>Descripción</label>
+      <input type="text" id="c-desc" placeholder="Ej: Una torre muy alta" class="full-width">
+      <div class="creator-grid">
+        <div><label>Ancho (px)</label><input type="number" id="c-w" value="100"></div>
+        <div><label>Largo (px)</label><input type="number" id="c-h" value="100"></div>
+        <div><label>Precio Ingame</label><input type="number" id="c-pg" value="1000"></div>
+        <div><label>Precio Real</label><input type="number" id="c-pr" value="5"></div>
+      </div>
+      <label>Color (HEX o RGBA)</label>
+      <input type="text" id="c-color" value="rgba(16, 185, 129, 0.3)" class="full-width">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <input type="checkbox" id="c-isvar">
+        <label for="c-isvar">¿Es de largo variable? (Modo Muro)</label>
+      </div>
+      <div class="creator-actions">
+        <button class="btn-cancel-item" onclick="closeItemCreator()">Cancelar</button>
+        <button class="btn-save-item" onclick="createCustomItem()">Crear Item</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="map-viewport">
+    <div id="map" class="grid">
+      <div id="guide-v" class="smart-guide vertical"><div class="guide-label"></div></div>
+      <div id="guide-h" class="smart-guide horizontal"><div class="guide-label"></div></div>
+    </div>
+  </div>
+
+  <script>
+
+    const map = document.getElementById("map");
+
+    let selectedType = null;
+    let preview = null;
+    let dragging = null;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    let totalGame = 0;
+    let totalReal = 0;
+
+    let currentMode = 'build';
+    let gridEnabled = true;
+    const gridSize = 5;
+
+    let drawingWall = false;
+    let drawStartX = 0;
+    let drawStartY = 0;
+
+    let currentBuildingIndex = 0;
+    let historyManager = [];
+
+    let panX = 0;
+    let panY = 0;
+    let currentZoom = 1.0;
+    let isPanning = false;
+    let panStartX = 0;
+    let panStartY = 0;
+    let isMobileView = false;
+
+    let initialPinchDistance = 0;
+    let initialZoom = 1.0;
+    let isPinching = false;
+    const viewport = document.getElementById("map-viewport");
+
+    let wallTapState = 0;
+    let wallStartDot = null;
+    let wallStartMapX = 0;
+    let wallStartMapY = 0;
+
+    function showWallToast(msg) {
+      const toast = document.getElementById('wall-toast');
+      toast.textContent = msg;
+      toast.classList.add('visible');
+      clearTimeout(showWallToast._timer);
+      showWallToast._timer = setTimeout(() => toast.classList.remove('visible'), 3000);
+    }
+
+    function hideWallToast() {
+      document.getElementById('wall-toast').classList.remove('visible');
+    }
+
+    function placeWallStartDot(mapX, mapY) {
+      removeWallStartDot();
+      wallStartDot = document.createElement('div');
+      wallStartDot.className = 'wall-start-dot';
+      wallStartDot.style.left = mapX + 'px';
+      wallStartDot.style.top = mapY + 'px';
+      map.appendChild(wallStartDot);
+    }
+
+    function removeWallStartDot() {
+      if (wallStartDot) {
+        wallStartDot.remove();
+        wallStartDot = null;
+      }
+    }
+
+    function cancelWallTap() {
+      wallTapState = 0;
+      removeWallStartDot();
+      hideWallToast();
+      hideConfirmBtn();
+      drawingWall = false;
+      touchState = 'idle';
+      if (preview) {
+        preview.remove();
+        preview = null;
+      }
+    }
+
+    function screenToMap(clientX, clientY) {
+      if (isMobileView) {
+        return {
+          x: (clientX - panX) / currentZoom,
+          y: (clientY - panY) / currentZoom
+        };
+      } else {
+        const rect = map.getBoundingClientRect();
+        return {
+          x: clientX - rect.left,
+          y: clientY - rect.top
+        };
+      }
+    }
+
+    function handleMobileWallTap(clientX, clientY) {
+      if (!selectedType || !selectedType.isVariable) return;
+      if (currentMode !== 'build') return;
+
+      let pos = screenToMap(clientX, clientY);
+      let mx = pos.x;
+      let my = pos.y;
+
+      if (gridEnabled) {
+        mx = snap(mx);
+        my = snap(my);
+      }
+
+      if (wallTapState === 0) {
+        wallStartMapX = mx;
+        wallStartMapY = my;
+        wallTapState = 1;
+        drawingWall = true;
+
+        placeWallStartDot(mx, my);
+        showWallToast('📍 Punto de inicio fijado — ahora toca el punto final del muro');
+
+        if (preview) { preview.remove(); preview = null; }
+        createPreviewAtPos(mx, my);
+
+      } else if (wallTapState === 1) {
+        let endX = mx;
+        let endY = my;
+
+        let dx = endX - wallStartMapX;
+        let dy = endY - wallStartMapY;
+        let dist = Math.hypot(dx, dy);
+        let thickness = Math.min(selectedType.width, selectedType.height);
+
+        if (dist < thickness) {
+          showWallToast('❌ Puntos demasiado cercanos, mueve más lejos');
+          return;
+        }
+
+        let angle = Math.atan2(dy, dx) * 180 / Math.PI;
+        let w = dist;
+        let h = thickness;
+        let l = wallStartMapX;
+        let t = wallStartMapY - thickness / 2;
+
+        if (!preview) createPreviewAtPos(wallStartMapX, wallStartMapY);
+
+        preview.style.width = w + 'px';
+        preview.style.height = h + 'px';
+        preview.style.left = l + 'px';
+        preview.style.top = t + 'px';
+        preview.style.borderRadius = '4px';
+        preview.innerHTML = `<div class="measure-label">${getMeters(w)}</div>`;
+        preview.style.transformOrigin = `0px ${thickness / 2}px`;
+        preview.style.transform = `rotate(${angle}deg)`;
+        preview.dataset.rotAngle = angle;
+        preview.dataset.originX = 0;
+        preview.dataset.originY = thickness / 2;
+
+        preview.classList.remove('invalid');
+        const invalid = isInvalid(l, t, w, h, preview);
+        if (invalid) {
+          preview.classList.add('invalid');
+          showWallToast('❌ Posición inválida, elige otro punto final');
+          showConfirmBtn(false);
+          return;
+        }
+
+        showConfirmBtn(true);
+        showWallToast('✅ Pulsa ✓ para confirmar el muro');
+      }
+    }
+
+    function createPreviewAtPos(mapX, mapY) {
+      if (preview) { preview.remove(); preview = null; }
+      preview = document.createElement("div");
+      preview.className = "building preview";
+      preview.style.background = selectedType.color;
+      preview.style.borderColor = selectedType.borderColor;
+      preview.style.boxShadow = `inset 0 0 15px ${selectedType.color}, 0 4px 10px rgba(0,0,0,0.3)`;
+      preview.dataset.rotation = 0;
+      preview.dataset.isWall = "true";
+
+      let thickness = Math.min(selectedType.width, selectedType.height);
+      preview.style.width = thickness + "px";
+      preview.style.height = thickness + "px";
+      preview.style.borderRadius = "50%";
+      preview.style.left = (mapX - thickness / 2) + "px";
+      preview.style.top = (mapY - thickness / 2) + "px";
+      preview.innerText = "";
+      map.appendChild(preview);
+    }
+
+    function updateWallPreviewToPoint(clientX, clientY) {
+      if (wallTapState !== 1 || !preview || !selectedType || !selectedType.isVariable) return;
+
+      let pos = screenToMap(clientX, clientY);
+      let mx = pos.x;
+      let my = pos.y;
+      if (gridEnabled) { mx = snap(mx); my = snap(my); }
+
+      let dx = mx - wallStartMapX;
+      let dy = my - wallStartMapY;
+      let dist = Math.hypot(dx, dy);
+      let thickness = Math.min(selectedType.width, selectedType.height);
+
+      if (dist < thickness) {
+        preview.style.width = thickness + "px";
+        preview.style.height = thickness + "px";
+        preview.style.left = (wallStartMapX - thickness / 2) + "px";
+        preview.style.top = (wallStartMapY - thickness / 2) + "px";
+        preview.style.borderRadius = "50%";
+        preview.style.transform = "none";
+        preview.dataset.rotAngle = 0;
+        preview.innerHTML = "";
+        return;
+      }
+
+      let angle = Math.atan2(dy, dx) * 180 / Math.PI;
+      let w = dist;
+      let h = thickness;
+      let l = wallStartMapX;
+      let t = wallStartMapY - thickness / 2;
+
+      preview.style.width = w + "px";
+      preview.style.height = h + "px";
+      preview.style.left = l + "px";
+      preview.style.top = t + "px";
+      preview.style.borderRadius = "4px";
+      preview.innerHTML = `<div class="measure-label">${getMeters(w)}</div>`;
+      preview.style.transformOrigin = `0px ${thickness / 2}px`;
+      preview.style.transform = `rotate(${angle}deg)`;
+      preview.dataset.rotAngle = angle;
+      preview.dataset.originX = 0;
+      preview.dataset.originY = thickness / 2;
+
+      if (isInvalid(l, t, w, h, preview)) {
+        preview.classList.add("invalid");
+        showConfirmBtn(false);
+      } else {
+        preview.classList.remove("invalid");
+        if (wallTapState === 1) showConfirmBtn(true);
+      }
+    }
+
+    function showConfirmBtn(isValid) {
+      if (!isMobileView) return;
+      const btn = document.getElementById('confirm-place-btn');
+      btn.classList.add('visible');
+      if (isValid) { btn.classList.remove('invalid-state'); }
+      else { btn.classList.add('invalid-state'); }
+    }
+
+    function hideConfirmBtn() {
+      document.getElementById('confirm-place-btn').classList.remove('visible', 'invalid-state');
+    }
+
+    function confirmPlacement() {
+      if (!isMobileView || !preview) return;
+      if (preview.classList.contains('invalid')) return;
+
+      if (selectedType && selectedType.isVariable && wallTapState === 1) {
+        const finalW = parseFloat(preview.style.width);
+        const thickness = Math.min(selectedType.width, selectedType.height);
+        const multiplier = finalW / Math.max(selectedType.width, selectedType.height);
+        placeBuilding(true, selectedType.priceGame * multiplier, selectedType.priceReal * multiplier);
+        wallTapState = 0;
+        drawingWall = false;
+        removeWallStartDot();
+        hideWallToast();
+      } else if (selectedType && !selectedType.isVariable) {
+        placeBuilding();
+      }
+      hideConfirmBtn();
+    }
+
+    function detectDevice() {
+      isMobileView = window.innerWidth <= 768;
+      if (isMobileView) {
+        document.body.classList.remove("is-pc");
+        document.body.classList.add("is-mobile");
+        document.getElementById('selector-container').classList.add('collapsed');
+        document.getElementById('ui').classList.add('is-collapsed');
+      } else {
+        document.body.classList.remove("is-mobile");
+        document.body.classList.add("is-pc");
+      }
+      updateMapTransform();
+    }
+
+    window.addEventListener("resize", detectDevice);
+    window.addEventListener("load", detectDevice);
+
+    function centerMap() {
+      panX = (window.innerWidth - 800) / 2;
+      panY = (window.innerHeight - 800) / 2;
+      currentZoom = 1.0;
+      updateMapTransform();
+    }
+
+    function updateMapTransform() {
+      if (isMobileView) {
+        map.style.transform = `translate(${panX}px, ${panY}px) scale(${currentZoom})`;
+      } else {
+        map.style.transform = `none`;
+      }
+    }
+
+    function changeZoom(delta) {
+      const oldZoom = currentZoom;
+      currentZoom = Math.min(Math.max(currentZoom + delta, 0.3), 3.0);
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      panX = vw / 2 - ((vw / 2 - panX) * currentZoom / oldZoom);
+      panY = vh / 2 - ((vh / 2 - panY) * currentZoom / oldZoom);
+      updateMapTransform();
+    }
+
+    function resetZoom() { centerMap(); }
+
+    function getMeters(px) {
+      return Math.round(px / (gridSize * 2)) + "m";
+    }
+
+    const buildingsData = [
+      { name: "Estructura Base", desc: "Habitación cerrada de metal.", width: 120, height: 80, color: "rgba(34, 197, 94, 0.25)", borderColor: "#22c55e", priceGame: 1000, priceReal: 5 },
+      { name: "Muro de Madera", desc: "Toca para poner punto inicial, luego toca el punto final.", width: 120, height: 10, color: "rgba(217, 119, 6, 0.4)", borderColor: "#f59e0b", priceGame: 500, priceReal: 2, isVariable: true },
+      { name: "Muro Metálico", desc: "Resistente. Toca para punto inicio, luego punto final.", width: 120, height: 10, color: "rgba(148, 163, 184, 0.35)", borderColor: "#94a3b8", priceGame: 800, priceReal: 4, isVariable: true },
+      { name: "Torre de Vigilancia", desc: "Permite ver por encima de muros.", width: 80, height: 80, color: "rgba(99, 102, 241, 0.25)", borderColor: "#818cf8", priceGame: 2500, priceReal: 10 },
+      { name: "Portón Metálico", desc: "Entrada segura para vehículos. Rueda del ratón para rotar.", width: 160, height: 15, color: "rgba(251, 191, 36, 0.25)", borderColor: "#fbbf24", priceGame: 3000, priceReal: 15, freeRotate: true },
+      { name: "Helipuerto Militar (Admin)", desc: "Zona segura e indestructible. Solo Admin.", width: 300, height: 300, color: "rgba(239, 68, 68, 0.15)", borderColor: "#ef4444", priceGame: 0, priceReal: 0, reqAdmin: true }
+    ];
+
+    let isLoginMode = true;
+    let currentUser = null;
+    let isAdmin = false;
+
+    function toggleAuthMode() {
+      isLoginMode = !isLoginMode;
+      document.getElementById('login-title').innerText = isLoginMode ? 'Iniciar Sesión' : 'Registrarse';
+      document.getElementById('login-btn').innerText = isLoginMode ? 'Entrar' : 'Crear Cuenta';
+      document.getElementById('login-toggle-text').innerText = isLoginMode ? '¿No tienes cuenta? Regístrate aquí' : '¿Ya tienes cuenta? Inicia sesión';
+    }
+
+    function handleAuth() {
+      const user = document.getElementById('login-user').value.trim();
+      const pass = document.getElementById('login-pass').value.trim();
+      if (!user || !pass) { alert("Por favor completa usuario y contraseña."); return; }
+
+      let users = JSON.parse(localStorage.getItem('baseUsers')) || {};
+
+      if (isLoginMode) {
+        if (user === 'admin' && pass === 'admin123') { completeLogin(user, true); return; }
+        if (users[user] && users[user] === pass) { completeLogin(user, false); }
+        else { alert("Credenciales incorrectas."); }
+      } else {
+        if (user.toLowerCase() === 'admin') { alert("El nombre de usuario 'admin' está reservado."); return; }
+        if (users[user]) { alert("El usuario ya existe. Por favor utiliza otro nombre o inicia sesión."); }
+        else { users[user] = pass; localStorage.setItem('baseUsers', JSON.stringify(users)); alert("Cuenta creada con éxito. Ahora puedes iniciar sesión."); toggleAuthMode(); }
+      }
+    }
+
+    function completeLogin(user, admin) {
+      currentUser = user;
+      isAdmin = admin;
+      document.getElementById('login-screen').style.display = 'none';
+      if (isAdmin) document.getElementById('admin-badge').style.display = 'inline-block';
+      document.getElementById('user-badge').innerText = `@${user}`;
+
+      currentBuildingIndex = 0;
+      selectBuilding();
+      updateBuildingUI();
+      document.body.classList.add("mode-build");
+
+      if (isAdmin) {
+        ['btn-admin-panel', 'btn-item-creator', 'pc-btn-admin-panel', 'pc-btn-item-creator'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.style.display = 'block';
+        });
+      }
+    }
+
+    let customBuildings = JSON.parse(localStorage.getItem('customBuildings') || '[]');
+
+    function showItemCreator() { document.getElementById('creator-panel').style.display = 'flex'; }
+    function closeItemCreator() { document.getElementById('creator-panel').style.display = 'none'; }
+
+    function createCustomItem() {
+      const name = document.getElementById('c-name').value.trim();
+      const desc = document.getElementById('c-desc').value.trim();
+      const w = parseInt(document.getElementById('c-w').value);
+      const h = parseInt(document.getElementById('c-h').value);
+      const pg = parseInt(document.getElementById('c-pg').value);
+      const pr = parseFloat(document.getElementById('c-pr').value);
+      const color = document.getElementById('c-color').value.trim();
+      const isVar = document.getElementById('c-isvar').checked;
+
+      if (!name) { alert("Ponle un nombre al menos."); return; }
+
+      const newItem = {
+        name, desc, width: w, height: h, priceGame: pg, priceReal: pr,
+        color: color,
+        borderColor: color.replace(/rgba?\((\d+),\s*(\d+),\s*(\d+),?\s*[\d.]*\)/, 'rgb($1,$2,$3)'),
+        isVariable: isVar, reqAdmin: true
+      };
+
+      customBuildings.push(newItem);
+      localStorage.setItem('customBuildings', JSON.stringify(customBuildings));
+      alert("¡Edificio '" + name + "' creado y añadido al catálogo!");
+      closeItemCreator();
+      updateBuildingUI();
+    }
+
+    function captureBaseState() {
+      const buildings = document.querySelectorAll('.building:not(.preview)');
+      let htmls = Array.from(buildings).map(b => b.outerHTML);
+      return { htmls, totalGame, totalReal };
+    }
+
+    function restoreBaseState(state) {
+      const buildings = document.querySelectorAll('.building:not(.preview)');
+      buildings.forEach(b => b.remove());
+      totalGame = state.totalGame || 0;
+      totalReal = state.totalReal || 0;
+      document.getElementById("totalGame").innerText = Math.round(totalGame);
+      document.getElementById("totalReal").innerText = (Math.round(totalReal * 10) / 10).toFixed(1);
+      state.htmls.forEach(html => {
+        let temp = document.createElement('div');
+        temp.innerHTML = html;
+        let el = temp.firstElementChild;
+        el.classList.remove("invalid");
+        map.appendChild(el);
+        enableDrag(el);
+      });
+      historyManager = [];
+    }
+
+    function saveMyBase() {
+      if (!currentUser) { alert("Primero debes iniciar sesión para guardar tu base."); return; }
+      const state = captureBaseState();
+      localStorage.setItem('savedBase_' + currentUser, JSON.stringify(state));
+      alert("¡Base guardada con éxito en tu cuenta local!");
+    }
+
+    function loadMyBase() {
+      if (!currentUser) { alert("Primero debes iniciar sesión para cargar tu base."); return; }
+      const dataStr = localStorage.getItem('savedBase_' + currentUser);
+      if (dataStr) {
+        if (confirm("Al cargar tu base sobreescribirás lo que estás haciendo ahora. ¿Continuar?")) {
+          restoreBaseState(JSON.parse(dataStr));
+        }
+      } else { alert("No tienes ninguna base guardada."); }
+    }
+
+    function sendBase() {
+      if (!currentUser) { alert("Primero debes iniciar sesión para enviar tu base."); return; }
+      if (totalGame === 0 && totalReal === 0) { alert("No puedes enviar una base vacía."); return; }
+      if (confirm("¿Estás seguro de enviar esta base a revisión?")) {
+        const state = captureBaseState();
+        let submissions = JSON.parse(localStorage.getItem('baseSubmissions') || '[]');
+        submissions.push({ user: currentUser, totalGame, totalReal: (Math.round(totalReal * 10) / 10).toFixed(1), date: new Date().toLocaleString(), state });
+        localStorage.setItem('baseSubmissions', JSON.stringify(submissions));
+        alert("¡Base enviada exitosamente al equipo de Admin!");
+      }
+    }
+
+    function showAdminPanel() {
+      const tbody = document.getElementById('admin-tbody');
+      tbody.innerHTML = '';
+      let submissions = JSON.parse(localStorage.getItem('baseSubmissions') || '[]');
+      if (submissions.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">No hay bases enviadas.</td></tr>';
+      } else {
+        submissions.forEach((sub, idx) => {
+          let tr = document.createElement('tr');
+          tr.innerHTML = `<td>@${sub.user}</td><td>💰 ${Math.round(sub.totalGame)} | 💵 ${sub.totalReal}</td><td>${sub.date}</td><td><button class="view-btn" onclick="viewSubmittedBase(${idx})">Abrir/Inspeccionar</button></td>`;
+          tbody.appendChild(tr);
+        });
+      }
+      document.getElementById('admin-panel').style.display = 'flex';
+    }
+
+    function closeAdminPanel() { document.getElementById('admin-panel').style.display = 'none'; }
+
+    window.viewSubmittedBase = function(index) {
+      let submissions = JSON.parse(localStorage.getItem('baseSubmissions') || '[]');
+      const sub = submissions[index];
+      if (sub && confirm("Abrir esta base limpiará tu diseño actual. ¿Deseas ver la base de @" + sub.user + "?")) {
+        closeAdminPanel();
+        restoreBaseState(sub.state);
+      }
+    }
+
+    function getAvailableBuildings() {
+      const baseList = isAdmin ? buildingsData : buildingsData.filter(b => !b.reqAdmin);
+      return baseList.concat(customBuildings);
+    }
+
+    function updateBuildingUI() {
+      const infoContainer = document.getElementById('b-info-container');
+      infoContainer.classList.add('fade-out');
+      setTimeout(() => {
+        const list = getAvailableBuildings();
+        if (currentBuildingIndex >= list.length) currentBuildingIndex = 0;
+        const b = list[currentBuildingIndex];
+        document.getElementById('b-name').innerText = b.name;
+        document.getElementById('b-desc').innerText = b.desc;
+        document.getElementById('b-price').innerText = `💰 ${b.priceGame} Ingame | 💵 ${b.priceReal} Real`;
+        infoContainer.classList.remove('fade-out');
+        infoContainer.classList.add('fade-in');
+        setTimeout(() => infoContainer.classList.remove('fade-in'), 300);
+      }, 300);
+      if (currentMode === 'build') selectBuilding();
+    }
+
+    function nextBuilding() {
+      if (isMobileView && wallTapState === 1) cancelWallTap();
+      const list = getAvailableBuildings();
+      currentBuildingIndex = (currentBuildingIndex + 1) % list.length;
+      selectBuilding();
+      updateBuildingUI();
+    }
+
+    function prevBuilding() {
+      if (isMobileView && wallTapState === 1) cancelWallTap();
+      const list = getAvailableBuildings();
+      currentBuildingIndex = (currentBuildingIndex - 1 + list.length) % list.length;
+      selectBuilding();
+      updateBuildingUI();
+    }
+
+    function selectBuilding() {
+      const list = getAvailableBuildings();
+      if (currentBuildingIndex >= list.length) currentBuildingIndex = 0;
+      selectedType = list[currentBuildingIndex];
+      if (currentMode !== 'build') selectedType = null;
+      if (preview) { preview.remove(); preview = null; }
+      if (isMobileView) { cancelWallTap(); hideConfirmBtn(); }
+    }
+
+    function setMode(mode) {
+      if (isMobileView && wallTapState === 1) cancelWallTap();
+
+      currentMode = (currentMode === mode) ? 'none' : mode;
+
+      const btnBuild = document.getElementById("btn-build");
+      const btnDelete = document.getElementById("btn-delete");
+      const btnMove = document.getElementById("btn-move");
+      const pcBtnBuild = document.getElementById("pc-btn-build");
+      const pcBtnDelete = document.getElementById("pc-btn-delete");
+      const pcBtnMove = document.getElementById("pc-btn-move");
+
+      [btnBuild, btnDelete, btnMove, pcBtnBuild, pcBtnDelete, pcBtnMove].filter(b => b).forEach(b => b.classList.remove("active"));
+
+      if (currentMode === 'build') { if (btnBuild) btnBuild.classList.add("active"); if (pcBtnBuild) pcBtnBuild.classList.add("active"); }
+      if (currentMode === 'delete') { if (btnDelete) btnDelete.classList.add("active"); if (pcBtnDelete) pcBtnDelete.classList.add("active"); }
+      if (currentMode === 'move') { if (btnMove) btnMove.classList.add("active"); if (pcBtnMove) pcBtnMove.classList.add("active"); }
+
+      document.body.classList.remove("mode-build", "mode-delete", "mode-move");
+      if (currentMode !== 'none') {
+        document.body.classList.add("mode-" + currentMode);
+        if (currentMode !== 'build' && preview) { preview.remove(); preview = null; }
+        if (currentMode !== 'build') hideConfirmBtn();
+      } else {
+        if (preview) { preview.remove(); preview = null; }
+        drawingWall = false;
+        hideConfirmBtn();
+      }
+
+      if (currentMode === 'build') {
+        const list = getAvailableBuildings();
+        if (currentBuildingIndex >= list.length) currentBuildingIndex = 0;
+        selectedType = list[currentBuildingIndex];
+      } else {
+        selectedType = null;
+      }
+    }
+
+    function togglePalette(id) { document.getElementById(id).classList.toggle('hidden'); }
+
+    function toggleMobileSelector() {
+      document.getElementById('selector-container').classList.toggle('collapsed');
+      document.getElementById('ui').classList.toggle('is-collapsed');
+    }
+
+    function toggleGrid() {
+      gridEnabled = !gridEnabled;
+      map.classList.toggle("grid");
+    }
+
+    function rotateMobile() {
+      if (preview) rotate(preview);
+      if (dragging) rotate(dragging);
+    }
+
+    function snap(value) { return Math.round(value / gridSize) * gridSize; }
+
+    // ─────────────────────────────────────────────
+    // Helper: lee el tamaño real de un elemento
+    // desde style.width/height (no offsetWidth/offsetHeight,
+    // que no cambian con transform:rotate).
+    // ─────────────────────────────────────────────
+    function getStyleSize(el) {
+      return {
+        w: parseFloat(el.style.width)  || el.offsetWidth,
+        h: parseFloat(el.style.height) || el.offsetHeight
+      };
+    }
+
+    viewport.addEventListener("mousedown", function(e) {
+      if (e.button !== 0) return;
+
+      if (currentMode === 'delete') {
+        if (e.target.classList.contains("building") && !e.target.classList.contains("preview")) {
+          deleteBuilding(e.target);
+        }
+        return;
+      }
+
+      if (currentMode === 'move') return;
+
+      if (currentMode === 'build' && selectedType) {
+        if (selectedType.isVariable) {
+          if (!drawingWall) {
+            if (!preview) createPreview(e);
+            drawingWall = true;
+            const rect = map.getBoundingClientRect();
+            drawStartX = gridEnabled ? snap(e.clientX - rect.left) : e.clientX - rect.left;
+            drawStartY = gridEnabled ? snap(e.clientY - rect.top)  : e.clientY - rect.top;
+          }
+        } else {
+          if (preview && !preview.classList.contains("invalid")) {
+            placeBuilding();
+          }
+        }
+      }
+    });
+
+    let touchState = 'idle';
+
+    viewport.addEventListener("touchstart", function(e) {
+      if (!isMobileView) return;
+
+      if (e.target.closest('#construction-tools, #system-tools, #zoom-controls, #ui, button, #confirm-place-btn')) return;
+
+      if (e.touches.length >= 2) {
+        touchState = 'pinching';
+        isPanning = false;
+        cancelWallTap();
+        initialPinchDistance = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        initialZoom = currentZoom;
+        return;
+      }
+
+      const touch = e.touches[0];
+
+      if (wallTapState === 1) {
+        e.preventDefault();
+        e.stopPropagation();
+        touchState = 'build_wall';
+        handleMobileWallTap(touch.clientX, touch.clientY);
+        return;
+      }
+
+      if (currentMode === 'build' && selectedType) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (selectedType.isVariable) {
+          touchState = 'build_wall';
+          handleMobileWallTap(touch.clientX, touch.clientY);
+        } else {
+          touchState = 'build_normal';
+          moveMobilePreview(touch.clientX, touch.clientY);
+        }
+        return;
+      }
+
+      if (currentMode === 'delete') {
+        e.preventDefault();
+        const target = document.elementFromPoint(touch.clientX, touch.clientY);
+        if (target && target.classList.contains('building') && !target.classList.contains('preview')) {
+          deleteBuilding(target);
+        }
+        return;
+      }
+
+      touchState = 'panning';
+      startPanning(touch);
+    }, { passive: false });
+
+    function moveMobilePreview(clientX, clientY) {
+      if (!selectedType || selectedType.isVariable) return;
+
+      const touchOffset = 50;
+      let x = (clientX - panX) / currentZoom - selectedType.width / 2;
+      let y = (clientY - panY) / currentZoom - selectedType.height / 2 - touchOffset / currentZoom;
+
+      if (gridEnabled) { x = snap(x); y = snap(y); }
+
+      if (!preview) {
+        preview = document.createElement("div");
+        preview.className = "building preview";
+        preview.style.background = selectedType.color;
+        preview.style.borderColor = selectedType.borderColor;
+        preview.style.boxShadow = `inset 0 0 15px ${selectedType.color}, 0 4px 10px rgba(0,0,0,0.3)`;
+        preview.dataset.rotation = 0;
+        preview.dataset.rotAngle = 0;
+        preview.dataset.originX = selectedType.width / 2;
+        preview.dataset.originY = selectedType.height / 2;
+        preview.style.width = selectedType.width + "px";
+        preview.style.height = selectedType.height + "px";
+        preview.innerHTML = `<div class="measure-label">${getMeters(selectedType.width)} x ${getMeters(selectedType.height)}</div>`;
+        map.appendChild(preview);
+      }
+
+      const size = getStyleSize(preview);
+
+      preview.style.left = x + "px";
+      preview.style.top = y + "px";
+
+      const invalid = isInvalid(x, y, size.w, size.h, preview);
+      if (invalid) { preview.classList.add("invalid"); }
+      else { preview.classList.remove("invalid"); }
+
+      showConfirmBtn(!invalid);
+    }
+
+    function placeMobileBuilding(clientX, clientY) {
+      if (!selectedType || selectedType.isVariable) return;
+      moveMobilePreview(clientX, clientY);
+      if (preview && !preview.classList.contains('invalid')) {
+        placeBuilding();
+        hideConfirmBtn();
+      }
+    }
+
+    viewport.addEventListener("dblclick", function(e) {
+      if (e.target.classList.contains("building")) deleteBuilding(e.target);
+    });
+
+    window.addEventListener("load", centerMap);
+
+    function deleteBuilding(el) {
+      if (!el.parentNode) return;
+      const pGame = parseFloat(el.dataset.gameCost);
+      const pReal = parseFloat(el.dataset.realCost);
+      if (!isNaN(pGame)) { totalGame -= pGame; totalReal -= pReal; }
+      else {
+        const name = el.innerText;
+        const bType = buildingsData.find(b => b.name === name);
+        if (bType) { totalGame -= bType.priceGame; totalReal -= bType.priceReal; }
+      }
+      historyManager.push({ action: 'delete', el: el.cloneNode(true), gameCost: pGame, realCost: pReal });
+      document.getElementById("totalGame").innerText = Math.round(totalGame);
+      document.getElementById("totalReal").innerText = (Math.round(totalReal * 10) / 10).toFixed(1);
+      el.remove();
+    }
+
+    function clearAll() {
+      if (confirm("¿Estás seguro de que quieres borrar TODA la base?")) {
+        if (isMobileView) cancelWallTap();
+        const buildings = document.querySelectorAll(".building:not(.preview)");
+        let currentState = [];
+        buildings.forEach(b => { currentState.push({ el: b.cloneNode(true) }); b.remove(); });
+        historyManager.push({ action: 'clear', elements: currentState, prevGame: totalGame, prevReal: totalReal });
+        totalGame = 0; totalReal = 0;
+        document.getElementById("totalGame").innerText = "0";
+        document.getElementById("totalReal").innerText = "0.0";
+      }
+    }
+
+    viewport.addEventListener("mousemove", handleMove);
+    viewport.addEventListener("touchmove", function(e) {
+      if (!isMobileView) return;
+      e.preventDefault();
+
+      if (e.touches.length === 2 && touchState === 'pinching') {
+        const currentDistance = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        const newZoom = Math.min(Math.max(initialZoom * (currentDistance / initialPinchDistance), 0.3), 3.0);
+        if (newZoom !== currentZoom) {
+          const oldZoom = currentZoom;
+          currentZoom = newZoom;
+          const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+          const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+          panX = cx - ((cx - panX) * currentZoom / oldZoom);
+          panY = cy - ((cy - panY) * currentZoom / oldZoom);
+          updateMapTransform();
+        }
+        return;
+      }
+
+      if (e.touches.length !== 1) return;
+      const touch = e.touches[0];
+
+      if (touchState === 'panning') {
+        if (dragging && currentMode === 'move') {
+          moveDragging(touch);
+        } else {
+          doPanning(touch);
+        }
+        return;
+      }
+
+      if (touchState === 'build_wall' && wallTapState === 1) {
+        updateWallPreviewToPoint(touch.clientX, touch.clientY);
+        return;
+      }
+
+      if (touchState === 'build_normal') {
+        moveMobilePreview(touch.clientX, touch.clientY);
+        return;
+      }
+
+      if (currentMode === 'move' && dragging) {
+        moveDragging(touch);
+        return;
+      }
+    }, { passive: false });
+
+    viewport.addEventListener("mousedown", (e) => {
+      if (!isMobileView && (e.button === 1 || (e.button === 0 && currentMode === 'none'))) startPanning(e);
+    });
+
+    window.addEventListener("mousemove", (e) => { if (isPanning) doPanning(e); });
+    window.addEventListener("mouseup",  () => { stopPanning(); isPinching = false; touchState = 'idle'; });
+    window.addEventListener("touchend", (e) => {
+      isPanning = false;
+      isPinching = false;
+      viewport.style.cursor = "crosshair";
+
+      if (dragging) {
+        const x = parseInt(dragging.style.left);
+        const y = parseInt(dragging.style.top);
+        const size = getStyleSize(dragging);
+        if (isInvalid(x, y, size.w, size.h, dragging)) {
+          dragging.style.left = dragging.dataset.lastX;
+          dragging.style.top = dragging.dataset.lastY;
+        }
+        dragging.classList.remove("invalid");
+        dragging = null;
+      }
+
+      if (touchState !== 'build_wall' && touchState !== 'build_normal') {
+        touchState = 'idle';
+      }
+    });
+
+    function startPanning(e) {
+      isPanning = true;
+      panStartX = e.clientX - panX;
+      panStartY = e.clientY - panY;
+      viewport.style.cursor = "grabbing";
+    }
+
+    function doPanning(e) {
+      panX = e.clientX - panStartX;
+      panY = e.clientY - panStartY;
+      updateMapTransform();
+    }
+
+    function stopPanning() {
+      isPanning = false;
+      viewport.style.cursor = "crosshair";
+    }
+
+    function handleMove(e) {
+      if (isMobileView && wallTapState === 1 && currentMode === 'build') {
+        updateWallPreviewToPoint(e.clientX, e.clientY);
+        return;
+      }
+
+      if (isMobileView && isPanning) return;
+
+      if (isMobileView && currentMode === 'build' && selectedType && !selectedType.isVariable && !dragging) {
+        if (!preview) {
+          preview = document.createElement("div");
+          preview.className = "building preview";
+          preview.style.background = selectedType.color;
+          preview.style.borderColor = selectedType.borderColor;
+          preview.style.boxShadow = `inset 0 0 15px ${selectedType.color}, 0 4px 10px rgba(0,0,0,0.3)`;
+          preview.dataset.rotation = 0;
+          preview.dataset.rotAngle = 0;
+          preview.dataset.originX = selectedType.width / 2;
+          preview.dataset.originY = selectedType.height / 2;
+          preview.style.width = selectedType.width + "px";
+          preview.style.height = selectedType.height + "px";
+          preview.innerHTML = `<div class="measure-label">${getMeters(selectedType.width)} x ${getMeters(selectedType.height)}</div>`;
+          map.appendChild(preview);
+        }
+        preview.style.display = 'flex';
+        movePreview(e);
+        showConfirmBtn(!preview.classList.contains('invalid'));
+        return;
+      }
+
+      if (!isMobileView && currentMode === 'build' && selectedType && selectedType.isVariable && drawingWall && preview) {
+        const rect = map.getBoundingClientRect();
+        let mx = e.clientX - rect.left;
+        let my = e.clientY - rect.top;
+        if (gridEnabled) { mx = snap(mx); my = snap(my); }
+
+        let dx = mx - drawStartX;
+        let dy = my - drawStartY;
+        let thickness = Math.min(selectedType.width, selectedType.height);
+        let dist = Math.hypot(dx, dy);
+        if (dist < thickness) dist = thickness;
+        let angle = Math.atan2(dy, dx) * 180 / Math.PI;
+        let l = drawStartX;
+        let t = drawStartY - thickness / 2;
+
+        preview.style.width = dist + "px";
+        preview.style.height = thickness + "px";
+        preview.style.left = l + "px";
+        preview.style.top = t + "px";
+        preview.style.borderRadius = "4px";
+        preview.innerHTML = `<div class="measure-label">${getMeters(dist)}</div>`;
+        preview.style.transformOrigin = `0px ${thickness / 2}px`;
+        preview.style.transform = `rotate(${angle}deg)`;
+        preview.dataset.rotAngle = angle;
+        preview.dataset.originX = 0;
+        preview.dataset.originY = thickness / 2;
+
+        if (isInvalid(l, t, dist, thickness, preview)) { preview.classList.add("invalid"); }
+        else { preview.classList.remove("invalid"); }
+        return;
+      }
+
+      if (!isMobileView && currentMode === 'build' && selectedType && selectedType.isVariable && !drawingWall) {
+        if (!preview) createPreview(e);
+        if (preview) { preview.style.display = 'flex'; movePreview(e); }
+        return;
+      }
+
+      if (!isMobileView && currentMode === 'build' && selectedType && !selectedType.isVariable && !dragging) {
+        if (!preview) createPreview(e);
+        if (preview) {
+          if (e.target.classList.contains("building") && !e.target.classList.contains("preview")) {
+            preview.style.display = 'none';
+          } else {
+            preview.style.display = 'flex';
+            movePreview(e);
+          }
+        }
+        return;
+      }
+
+      if (dragging && currentMode === 'move') { moveDragging(e); }
+    }
+
+    document.addEventListener("mouseup", handleUp);
+    document.addEventListener("touchend", function(e) { handleUp(e.changedTouches[0]); });
+
+    function handleUp(e) {
+      hideGuides();
+
+      if (!isMobileView && drawingWall && preview && selectedType && selectedType.isVariable) {
+        drawingWall = false;
+        let finalW = parseInt(preview.style.width);
+        let thickness = Math.min(selectedType.width, selectedType.height);
+
+        if (finalW <= thickness) {
+          preview.style.width = thickness + "px";
+          preview.style.height = thickness + "px";
+          preview.style.borderRadius = "50%";
+          preview.style.transform = `none`;
+          preview.dataset.rotAngle = 0;
+          preview.dataset.originX = 0;
+          preview.dataset.originY = 0;
+          movePreview(e);
+          if (!preview.classList.contains("invalid")) placeBuilding(false);
+        } else if (!preview.classList.contains("invalid")) {
+          const defaultLength = Math.max(selectedType.width, selectedType.height);
+          const multiplier = finalW / defaultLength;
+          placeBuilding(true, selectedType.priceGame * multiplier, selectedType.priceReal * multiplier);
+        } else {
+          preview.style.width = thickness + "px";
+          preview.style.height = thickness + "px";
+          preview.style.borderRadius = "50%";
+          preview.style.transform = `none`;
+          preview.dataset.rotAngle = 0;
+          movePreview(e);
+        }
+      }
+
+      if (dragging) {
+        const x = parseInt(dragging.style.left);
+        const y = parseInt(dragging.style.top);
+        const size = getStyleSize(dragging);
+        if (isInvalid(x, y, size.w, size.h, dragging)) {
+          dragging.style.left = dragging.dataset.lastX;
+          dragging.style.top = dragging.dataset.lastY;
+        }
+        dragging.classList.remove("invalid");
+        dragging = null;
+      }
+    }
+
+    document.addEventListener("keydown", function(e) {
+      if (e.key.toLowerCase() === "r") {
+        if (preview) rotate(preview);
+        if (dragging) rotate(dragging);
+      }
+      if (e.ctrlKey && e.key.toLowerCase() === "z") undoLastAction();
+      if (e.key === "Escape" && isMobileView) cancelWallTap();
+    });
+
+    function undoLastAction() {
+      if (historyManager.length === 0) return;
+      const lastAction = historyManager.pop();
+
+      if (lastAction.action === 'place') {
+        if (lastAction.el.parentNode) {
+          const pG = parseFloat(lastAction.el.dataset.gameCost) || 0;
+          const pR = parseFloat(lastAction.el.dataset.realCost) || 0;
+          totalGame -= pG; totalReal -= pR;
+          document.getElementById("totalGame").innerText = Math.round(totalGame);
+          document.getElementById("totalReal").innerText = (Math.round(totalReal * 10) / 10).toFixed(1);
+          lastAction.el.remove();
+        }
+      } else if (lastAction.action === 'delete') {
+        const cloned = lastAction.el.cloneNode(true);
+        map.appendChild(cloned);
+        enableDrag(cloned);
+        totalGame += lastAction.gameCost; totalReal += lastAction.realCost;
+        document.getElementById("totalGame").innerText = Math.round(totalGame);
+        document.getElementById("totalReal").innerText = (Math.round(totalReal * 10) / 10).toFixed(1);
+      } else if (lastAction.action === 'clear') {
+        lastAction.elements.forEach(item => { const cloned = item.el.cloneNode(true); map.appendChild(cloned); enableDrag(cloned); });
+        totalGame = lastAction.prevGame; totalReal = lastAction.prevReal;
+        document.getElementById("totalGame").innerText = Math.round(totalGame);
+        document.getElementById("totalReal").innerText = (Math.round(totalReal * 10) / 10).toFixed(1);
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    //  rotateFree: rota el elemento en deltaDeg grados.
+    //  FIX: después de rotar actualiza la validación del preview
+    //  usando las dimensiones reales del style (no offsetWidth).
+    // ─────────────────────────────────────────────────────────────────
+    function rotateFree(el, deltaDeg) {
+      const current = parseFloat(el.dataset.rotAngle || 0);
+      const next = ((current + deltaDeg) % 360 + 360) % 360;
+      const w = parseFloat(el.style.width);
+      const h = parseFloat(el.style.height);
+
+      el.dataset.rotAngle = next;
+      el.dataset.originX = w / 2;
+      el.dataset.originY = h / 2;
+      el.style.transformOrigin = 'center center';
+      el.style.transform = next === 0 ? 'none' : `rotate(${next}deg)`;
+
+      // Contra-rotar la etiqueta manteniendo el centrado
+      const label = el.querySelector('.measure-label');
+      if (label) {
+        label.style.transform = next === 0
+          ? 'translate(-50%, -50%)'
+          : `translate(-50%, -50%) rotate(${-next}deg)`;
+      }
+
+      // FIX: usar dimensiones del style en lugar de offsetWidth/offsetHeight
+      const x = parseFloat(el.style.left);
+      const y = parseFloat(el.style.top);
+      if (isInvalid(x, y, w, h, el)) { el.classList.add('invalid'); }
+      else { el.classList.remove('invalid'); }
+    }
+
+    // Toda rotación pasa por rotateFree con pasos de 15°
+    function rotate(el) {
+      rotateFree(el, 15);
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    //  createPreview: inicializa rotAngle/originX/originY
+    // ─────────────────────────────────────────────────────────────────
+    function createPreview(e) {
+      preview = document.createElement("div");
+      preview.className = "building preview";
+      preview.style.background = selectedType.color;
+      preview.style.borderColor = selectedType.borderColor;
+      preview.style.boxShadow = `inset 0 0 15px ${selectedType.color}, 0 4px 10px rgba(0,0,0,0.3)`;
+      preview.dataset.rotAngle = 0;
+      if (selectedType.isVariable) preview.dataset.isWall = "true";
+
+      if (selectedType.isVariable) {
+        let thickness = Math.min(selectedType.width, selectedType.height);
+        preview.style.width = thickness + "px";
+        preview.style.height = thickness + "px";
+        preview.style.borderRadius = "50%";
+        preview.dataset.originX = thickness / 2;
+        preview.dataset.originY = thickness / 2;
+        preview.innerText = "";
+      } else {
+        preview.style.width = selectedType.width + "px";
+        preview.style.height = selectedType.height + "px";
+        preview.dataset.originX = selectedType.width / 2;
+        preview.dataset.originY = selectedType.height / 2;
+        let mWidth = getMeters(selectedType.width);
+        let mHeight = getMeters(selectedType.height);
+        preview.innerHTML = `<div class="measure-label">${mWidth} x ${mHeight}</div>`;
+      }
+
+      map.appendChild(preview);
+      movePreview(e);
+    }
+
+    function hideGuides() {
+      const gV = document.getElementById("guide-v");
+      const gH = document.getElementById("guide-h");
+      if (gV) gV.style.display = "none";
+      if (gH) gH.style.display = "none";
+    }
+
+    function applySmartSnap(x, y, w, h, ignoreElement) {
+      const snapDistance = 8;
+      let newX = x, newY = y;
+      let gX = null, gY = null;
+      let targetX = null, targetY = null;
+      const buildings = document.querySelectorAll(".building:not(.preview)");
+      let minDx = snapDistance, minDy = snapDistance;
+      let ptsX = [x, x + w / 2, x + w];
+      let ptsY = [y, y + h / 2, y + h];
+      let offsetsX = [0, w / 2, w];
+      let offsetsY = [0, h / 2, h];
+
+      for (let b of buildings) {
+        if (b === ignoreElement) continue;
+        if (parseFloat(b.dataset.rotAngle || 0) !== 0) continue;
+        let bx = parseFloat(b.style.left), by = parseFloat(b.style.top);
+        // FIX: usar dimensiones del style para buildings colocados con rotación
+        const bSize = getStyleSize(b);
+        let bw = bSize.w, bh = bSize.h;
+        let bPtsX = [bx, bx + bw / 2, bx + bw];
+        let bPtsY = [by, by + bh / 2, by + bh];
+        for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
+          let dx = Math.abs(ptsX[i] - bPtsX[j]);
+          if (dx < minDx) { minDx = dx; newX = bPtsX[j] - offsetsX[i]; gX = bPtsX[j]; targetX = b; }
+        }
+        for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
+          let dy = Math.abs(ptsY[i] - bPtsY[j]);
+          if (dy < minDy) { minDy = dy; newY = bPtsY[j] - offsetsY[i]; gY = bPtsY[j]; targetY = b; }
+        }
+      }
+
+      let gV = document.getElementById("guide-v");
+      let gH = document.getElementById("guide-h");
+
+      if (gX !== null && targetX) {
+        let myTop = newY, myBot = newY + h;
+        let tTop = parseFloat(targetX.style.top), tBot = tTop + getStyleSize(targetX).h;
+        let startY, endY, gap;
+        if (myBot <= tTop) { startY = myBot; endY = tTop; gap = tTop - myBot; }
+        else if (myTop >= tBot) { startY = tBot; endY = myTop; gap = myTop - tBot; }
+        else { startY = Math.min(myTop, tTop); endY = Math.max(myBot, tBot); gap = 0; }
+        let lineLen = Math.max(endY - startY, 1);
+        gV.style.left = gX + "px"; gV.style.top = startY + "px"; gV.style.height = lineLen + "px"; gV.style.display = "block";
+        let lbl = gV.querySelector(".guide-label"); lbl.innerText = getMeters(gap); lbl.style.display = lineLen > 15 ? "block" : "none";
+      } else { gV.style.display = "none"; }
+
+      if (gY !== null && targetY) {
+        let myLeft = newX, myRight = newX + w;
+        let tLeft = parseFloat(targetY.style.left), tRight = tLeft + getStyleSize(targetY).w;
+        let startX, endX, gap;
+        if (myRight <= tLeft) { startX = myRight; endX = tLeft; gap = tLeft - myRight; }
+        else if (myLeft >= tRight) { startX = tRight; endX = myLeft; gap = myLeft - tRight; }
+        else { startX = Math.min(myLeft, tLeft); endX = Math.max(myRight, tRight); gap = 0; }
+        let lineLen = Math.max(endX - startX, 1);
+        gH.style.top = gY + "px"; gH.style.left = startX + "px"; gH.style.width = lineLen + "px"; gH.style.display = "block";
+        let lbl = gH.querySelector(".guide-label"); lbl.innerText = getMeters(gap); lbl.style.display = lineLen > 15 ? "block" : "none";
+      } else { gH.style.display = "none"; }
+
+      return { x: newX, y: newY };
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    //  movePreview: usa getStyleSize para que la hitbox respete
+    //  las dimensiones reales aunque el elemento esté rotado.
+    // ─────────────────────────────────────────────────────────────────
+    function movePreview(e) {
+      const touchOffset = isMobileView ? 50 : 0;
+      let x, y;
+
+      // FIX: leer siempre del style, no de offsetWidth/offsetHeight
+      const size = getStyleSize(preview);
+
+      if (isMobileView) {
+        x = (e.clientX - panX) / currentZoom - size.w / 2;
+        y = (e.clientY - panY) / currentZoom - size.h / 2 - (touchOffset / currentZoom);
+      } else {
+        const rect = map.getBoundingClientRect();
+        x = e.clientX - rect.left - size.w / 2;
+        y = e.clientY - rect.top  - size.h / 2;
+      }
+
+      if (gridEnabled) { x = snap(x); y = snap(y); }
+
+      preview.style.left = x + "px";
+      preview.style.top  = y + "px";
+
+      // FIX: pasar dimensiones del style a isInvalid
+      if (isInvalid(x, y, size.w, size.h, preview)) { preview.classList.add("invalid"); }
+      else { preview.classList.remove("invalid"); }
+    }
+
+    function placeBuilding(isCustomSize = false, cGame = 0, cReal = 0) {
+      const placed = preview.cloneNode(true);
+      placed.classList.remove("preview");
+      placed.style.borderStyle = "solid";
+      placed.style.display = 'flex';
+      placed.style.borderRadius = "4px";
+
+      const rotAngle = parseFloat(preview.dataset.rotAngle || 0);
+      placed.dataset.rotAngle = rotAngle;
+      placed.dataset.originX = preview.dataset.originX || 0;
+      placed.dataset.originY = preview.dataset.originY || 0;
+      if (preview.dataset.origWidth) {
+        placed.dataset.origWidth  = preview.dataset.origWidth;
+        placed.dataset.origHeight = preview.dataset.origHeight;
+      }
+      placed.style.transformOrigin = 'center center';
+      if (selectedType.isVariable) {
+        placed.style.transform = preview.style.transform;
+        placed.style.transformOrigin = preview.style.transformOrigin;
+      } else {
+        placed.style.transform = rotAngle === 0 ? 'none' : `rotate(${rotAngle}deg)`;
+      }
+
+      if (selectedType.isVariable) {
+        let w = parseInt(placed.style.width);
+        placed.innerHTML = `<div class="measure-label">${getMeters(w)}</div>`;
+      } else {
+        placed.innerHTML = `<div class="measure-label">${getMeters(parseInt(placed.style.width))} x ${getMeters(parseInt(placed.style.height))}</div>`;
+      }
+
+      if (!selectedType.isVariable && rotAngle !== 0) {
+        const label = placed.querySelector('.measure-label');
+        if (label) label.style.transform = `translate(-50%, -50%) rotate(${-rotAngle}deg)`;
+      }
+
+      placed.style.animation = 'none';
+      placed.offsetHeight;
+      placed.style.animation = null;
+
+      map.appendChild(placed);
+      enableDrag(placed);
+
+      const gameCost = isCustomSize ? cGame : selectedType.priceGame;
+      const realCost = isCustomSize ? cReal : selectedType.priceReal;
+
+      placed.dataset.gameCost = gameCost;
+      placed.dataset.realCost = realCost;
+
+      totalGame += gameCost;
+      totalReal += realCost;
+
+      document.getElementById("totalGame").innerText = Math.round(totalGame);
+      document.getElementById("totalReal").innerText = (Math.round(totalReal * 10) / 10).toFixed(1);
+
+      historyManager.push({ action: 'place', el: placed });
+
+      if (selectedType.isVariable) {
+        let thickness = Math.min(selectedType.width, selectedType.height);
+        preview.style.width = thickness + "px";
+        preview.style.height = thickness + "px";
+        preview.style.borderRadius = "50%";
+        preview.style.transform = `none`;
+        preview.style.transformOrigin = 'center center';
+        preview.dataset.rotAngle = 0;
+        preview.dataset.originX = thickness / 2;
+        preview.dataset.originY = thickness / 2;
+        preview.innerText = "";
+      } else {
+        preview.style.width = selectedType.width + 'px';
+        preview.style.height = selectedType.height + 'px';
+        preview.style.transform = 'none';
+        preview.style.transformOrigin = 'center center';
+        preview.dataset.rotAngle = 0;
+        preview.dataset.originX = selectedType.width / 2;
+        preview.dataset.originY = selectedType.height / 2;
+        delete preview.dataset.origWidth;
+        delete preview.dataset.origHeight;
+      }
+
+      preview.remove();
+      preview = null;
+    }
+
+    function enableDrag(el) {
+      el.addEventListener("mousedown", handleDragStart);
+      el.addEventListener("touchstart", function(e) {
+        if (isMobileView) {
+          if (currentMode === 'delete') {
+            e.preventDefault();
+            e.stopPropagation();
+            deleteBuilding(el);
+            return;
+          }
+          if (currentMode === 'move') {
+            e.preventDefault();
+            e.stopPropagation();
+            touchState = 'panning';
+            handleDragStart(e.touches[0]);
+            return;
+          }
+          return;
+        }
+        handleDragStart(e.touches[0]);
+      }, { passive: false });
+
+      function handleDragStart(e) {
+        if (e.button !== undefined && e.button !== 0) return;
+        if (currentMode === 'delete') { deleteBuilding(el); return; }
+        if (currentMode !== 'move') return;
+        dragging = el;
+        const rect = map.getBoundingClientRect();
+        const elLeft = parseFloat(el.style.left) || 0;
+        const elTop = parseFloat(el.style.top) || 0;
+        offsetX = e.clientX - rect.left - elLeft;
+        offsetY = e.clientY - rect.top - elTop;
+        el.dataset.lastX = el.style.left;
+        el.dataset.lastY = el.style.top;
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    //  moveDragging: usa getStyleSize para la hitbox correcta
+    // ─────────────────────────────────────────────────────────────────
+    function moveDragging(e) {
+      const touchOffset = isMobileView ? 50 : 0;
+      let x, y;
+
+      if (isMobileView) {
+        x = (e.clientX - panX) / currentZoom - offsetX;
+        y = (e.clientY - panY) / currentZoom - offsetY - (touchOffset / currentZoom);
+      } else {
+        const rect = map.getBoundingClientRect();
+        x = e.clientX - rect.left - offsetX;
+        y = e.clientY - rect.top - offsetY;
+      }
+
+      if (gridEnabled) { x = snap(x); y = snap(y); }
+
+      // FIX: usar dimensiones del style en moveDragging también
+      const size = getStyleSize(dragging);
+
+      dragging.style.left = x + "px";
+      dragging.style.top  = y + "px";
+
+      if (isInvalid(x, y, size.w, size.h, dragging)) { dragging.classList.add("invalid"); }
+      else { dragging.classList.remove("invalid"); }
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       COLISIONES POLIGONALES (SAT)
+       FIX PRINCIPAL: isInvalid ahora lee w/h desde style (no offset*)
+       para que la hitbox sea correcta incluso cuando el elemento
+       está rotado con transform:rotate().
+    ═══════════════════════════════════════════════════════════════ */
+
+    function getCorners(x, y, w, h, angle, origX, origY) {
+      if (!angle || angle === 0) {
+        return [{ x, y }, { x: x + w, y }, { x: x + w, y: y + h }, { x, y: y + h }];
+      }
+      let rad = angle * Math.PI / 180;
+      let cos = Math.cos(rad), sin = Math.sin(rad);
+      function rotatePt(px, py) {
+        let dx = px - origX, dy = py - origY;
+        return { x: x + origX + (dx * cos - dy * sin), y: y + origY + (dx * sin + dy * cos) };
+      }
+      return [rotatePt(0, 0), rotatePt(w, 0), rotatePt(w, h), rotatePt(0, h)];
+    }
+
+    function getAxes(poly) {
+      let axes = [];
+      for (let i = 0; i < poly.length; i++) {
+        let p1 = poly[i], p2 = poly[(i + 1) % poly.length];
+        let normal = { x: -(p2.y - p1.y), y: p2.x - p1.x };
+        let len = Math.hypot(normal.x, normal.y);
+        if (len > 0) axes.push({ x: normal.x / len, y: normal.y / len });
+      }
+      return axes;
+    }
+
+    function project(poly, axis) {
+      let min = Infinity, max = -Infinity;
+      for (let p of poly) {
+        let proj = p.x * axis.x + p.y * axis.y;
+        if (proj < min) min = proj;
+        if (proj > max) max = proj;
+      }
+      return { min, max };
+    }
+
+    function polysCollide(poly1, poly2) {
+      let axes = [...getAxes(poly1), ...getAxes(poly2)];
+      for (let axis of axes) {
+        let proj1 = project(poly1, axis);
+        let proj2 = project(poly2, axis);
+        if (proj1.max - 0.5 < proj2.min || proj2.max - 0.5 < proj1.min) return false;
+      }
+      return true;
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    //  isInvalid: FIX — usar style.width/height en vez de offsetWidth
+    //  para que la hitbox del SAT sea siempre correcta.
+    // ─────────────────────────────────────────────────────────────────
+    function isInvalid(x, y, w, h, ignore = null) {
+      let angle   = parseFloat(ignore ? (ignore.dataset.rotAngle  || 0) : 0);
+      let origX   = parseFloat(ignore ? (ignore.dataset.originX   || 0) : 0);
+      let origY   = parseFloat(ignore ? (ignore.dataset.originY   || 0) : 0);
+      let selfIsWall = ignore ? (ignore.dataset.isWall === "true") : false;
+      let poly1 = getCorners(x, y, w, h, angle, origX, origY);
+
+      for (let p of poly1) {
+        if (p.x < 0 || p.y < 0 || p.x > map.clientWidth || p.y > map.clientHeight) return true;
+      }
+
+      const buildings = document.querySelectorAll(".building");
+      for (let b of buildings) {
+        if (b === ignore) continue;
+        if (b.classList.contains("preview")) continue;
+        if (selfIsWall && b.dataset.isWall === "true") continue;
+
+        let bx     = parseInt(b.style.left);
+        let by     = parseInt(b.style.top);
+        // FIX: leer dimensiones desde style, no desde offsetWidth/offsetHeight
+        const bSize = getStyleSize(b);
+        let bw     = bSize.w;
+        let bh     = bSize.h;
+        let bAngle = parseFloat(b.dataset.rotAngle  || 0);
+        let bOrigX = parseFloat(b.dataset.originX   || 0);
+        let bOrigY = parseFloat(b.dataset.originY   || 0);
+
+        let poly2 = getCorners(bx, by, bw, bh, bAngle, bOrigX, bOrigY);
+        if (polysCollide(poly1, poly2)) return true;
+      }
+      return false;
+    }
+
+  </script>
+
+</body>
+</html>
