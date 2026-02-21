@@ -874,7 +874,7 @@
       <button class="circle-btn active" id="btn-build" onclick="setMode('build')" title="Construir (B)">🔨</button>
       <button class="circle-btn" id="btn-move" onclick="setMode('move')" title="Mover (M)">✋</button>
       <button class="circle-btn" id="btn-delete" onclick="setMode('delete')" title="Borrar (D)">🗑️</button>
-      <button class="circle-btn" onclick="rotateMobile()" title="Rotar (R)">🔄</button>
+      <button class="circle-btn" id="btn-rotate" title="Rotar (R)">🔄</button>
       <button class="circle-btn" onclick="undoLastAction()" title="Deshacer (Ctrl+Z)">↩️</button>
       <button class="circle-btn danger" id="btn-clear" onclick="clearAll()" title="Borrar Todo">💣</button>
     </div>
@@ -1679,6 +1679,14 @@
       if (preview) rotate(preview);
       if (dragging) rotate(dragging);
     }
+
+    // Usar touchstart en el botón rotar para que funcione
+    // mientras hay otro dedo en el mapa
+    document.getElementById('btn-rotate').addEventListener('touchstart', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      rotateMobile();
+    }, { passive: false });
 
     function snap(value) { return Math.round(value / gridSize) * gridSize; }
 
