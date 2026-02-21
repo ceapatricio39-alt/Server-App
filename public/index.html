@@ -789,7 +789,12 @@
 
   <div id="admin-panel">
     <div class="admin-box">
-      <h2>Bases Enviadas <button class="close-btn" onclick="closeAdminPanel()">×</button></h2>
+      <h2>Bases Enviadas
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button class="close-btn" onclick="showAdminPanel()" title="Refrescar" style="font-size:1.1rem;">🔄</button>
+          <button class="close-btn" onclick="closeAdminPanel()">×</button>
+        </div>
+      </h2>
       <table class="admin-table">
         <thead>
           <tr>
@@ -1302,9 +1307,6 @@
       if (isAdmin) document.getElementById('admin-badge').style.display = 'inline-block';
       document.getElementById('user-badge').innerText = `@${user}`;
 
-      currentBuildingIndex = 0;
-      selectBuilding();
-      updateBuildingUI();
       document.body.classList.add("mode-build");
 
       if (isAdmin) {
@@ -1313,6 +1315,14 @@
           if (el) el.style.display = 'block';
         });
       }
+
+      // Cargar edificios personalizados del servidor para todos los usuarios
+      apiGet('/api/custom-buildings').then(data => {
+        if (Array.isArray(data)) customBuildings = data;
+        currentBuildingIndex = 0;
+        selectBuilding();
+        updateBuildingUI();
+      });
     }
 
     let customBuildings = [];
@@ -1320,7 +1330,7 @@
     function showItemCreator() { document.getElementById('creator-panel').style.display = 'flex'; }
     function closeItemCreator() { document.getElementById('creator-panel').style.display = 'none'; }
 
-    function createCustomItem() {
+    async function createCustomItem() {
       const name = document.getElementById('c-name').value.trim();
       const desc = document.getElementById('c-desc').value.trim();
       const w = parseInt(document.getElementById('c-w').value);
@@ -1336,11 +1346,14 @@
         name, desc, width: w, height: h, priceGame: pg, priceReal: pr,
         color: color,
         borderColor: color.replace(/rgba?\((\d+),\s*(\d+),\s*(\d+),?\s*[\d.]*\)/, 'rgb($1,$2,$3)'),
-        isVariable: isVar, reqAdmin: true
+        isVariable: isVar, reqAdmin: false
       };
 
+      const res = await apiPost('/api/custom-buildings', newItem);
+      if (!res.ok) { alert("Error al guardar el edificio."); return; }
+
       customBuildings.push(newItem);
-      alert("¡Edificio '" + name + "' creado y añadido al catálogo!");
+      alert("¡Edificio '" + name + "' creado! Ya visible para todos los jugadores.");
       closeItemCreator();
       updateBuildingUI();
     }
