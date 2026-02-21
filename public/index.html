@@ -401,6 +401,10 @@
       transform: none !important;
     }
 
+    #zoom-controls.zoom-hidden {
+      display: none !important;
+    }
+
     .stat-item {
       display: flex;
       justify-content: space-between;
@@ -1439,9 +1443,8 @@
       tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Cargando...</td></tr>';
       document.getElementById('admin-panel').style.display = 'flex';
 
-      // Ocultar zoom en móvil
-      const zoom = document.getElementById('zoom-controls');
-      if (zoom) zoom.style.display = 'none';
+      // Ocultar zoom en móvil con clase CSS (evita que !important lo sobreescriba)
+      if (isMobileView) document.getElementById('zoom-controls').classList.add('zoom-hidden');
 
       const subs = await apiGet('/api/submissions');
       tbody.innerHTML = '';
@@ -1499,8 +1502,7 @@
     function closeAdminPanel() {
       document.getElementById('admin-panel').style.display = 'none';
       // Restaurar zoom en móvil
-      const zoom = document.getElementById('zoom-controls');
-      if (zoom && isMobileView) zoom.style.display = 'flex';
+      if (isMobileView) document.getElementById('zoom-controls').classList.remove('zoom-hidden');
     }
 
     window.viewSubmittedBase = function(index) {
@@ -2338,11 +2340,19 @@
         if (currentMode === 'delete') { deleteBuilding(el); return; }
         if (currentMode !== 'move') return;
         dragging = el;
-        const rect = map.getBoundingClientRect();
         const elLeft = parseFloat(el.style.left) || 0;
-        const elTop = parseFloat(el.style.top) || 0;
-        offsetX = e.clientX - rect.left - elLeft;
-        offsetY = e.clientY - rect.top - elTop;
+        const elTop  = parseFloat(el.style.top)  || 0;
+        if (isMobileView) {
+          // Convertir posición del dedo a coordenadas del mapa
+          const fingerMapX = (e.clientX - panX) / currentZoom;
+          const fingerMapY = (e.clientY - panY) / currentZoom;
+          offsetX = fingerMapX - elLeft;
+          offsetY = fingerMapY - elTop;
+        } else {
+          const rect = map.getBoundingClientRect();
+          offsetX = e.clientX - rect.left - elLeft;
+          offsetY = e.clientY - rect.top  - elTop;
+        }
         el.dataset.lastX = el.style.left;
         el.dataset.lastY = el.style.top;
       }
@@ -2352,12 +2362,11 @@
     //  moveDragging: usa getStyleSize para la hitbox correcta
     // ─────────────────────────────────────────────────────────────────
     function moveDragging(e) {
-      const touchOffset = isMobileView ? 50 : 0;
       let x, y;
 
       if (isMobileView) {
         x = (e.clientX - panX) / currentZoom - offsetX;
-        y = (e.clientY - panY) / currentZoom - offsetY - (touchOffset / currentZoom);
+        y = (e.clientY - panY) / currentZoom - offsetY;
       } else {
         const rect = map.getBoundingClientRect();
         x = e.clientX - rect.left - offsetX;
