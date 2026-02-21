@@ -806,6 +806,22 @@
         </thead>
         <tbody id="admin-tbody"></tbody>
       </table>
+
+      <h3 style="margin: 20px 0 10px 0; color: #10b981; display:flex; justify-content:space-between; align-items:center;">
+        Edificios Personalizados
+        <button class="close-btn" onclick="loadCustomBuildingsAdmin()" title="Refrescar" style="font-size:1rem;">🔄</button>
+      </h3>
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Tamaño</th>
+            <th>Precio</th>
+            <th>Eliminar</th>
+          </tr>
+        </thead>
+        <tbody id="custom-buildings-tbody"></tbody>
+      </table>
     </div>
   </div>
 
@@ -1423,6 +1439,10 @@
       tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Cargando...</td></tr>';
       document.getElementById('admin-panel').style.display = 'flex';
 
+      // Ocultar zoom en móvil
+      const zoom = document.getElementById('zoom-controls');
+      if (zoom) zoom.style.display = 'none';
+
       const subs = await apiGet('/api/submissions');
       tbody.innerHTML = '';
 
@@ -1434,12 +1454,54 @@
           tr.innerHTML = `<td>@${sub.username}</td><td>💰 ${Math.round(sub.totalGame)} | 💵 ${sub.totalReal}</td><td>${new Date(sub.createdAt).toLocaleString()}</td><td><button class="view-btn" onclick="viewSubmittedBase(${idx})">Abrir/Inspeccionar</button></td>`;
           tbody.appendChild(tr);
         });
-        // Guardar submissions en memoria para viewSubmittedBase
         window._adminSubs = subs;
+      }
+
+      loadCustomBuildingsAdmin();
+    }
+
+    async function loadCustomBuildingsAdmin() {
+      const tbody = document.getElementById('custom-buildings-tbody');
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Cargando...</td></tr>';
+      const items = await apiGet('/api/custom-buildings');
+      tbody.innerHTML = '';
+      if (!Array.isArray(items) || items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">No hay edificios personalizados.</td></tr>';
+      } else {
+        items.forEach(item => {
+          let tr = document.createElement('tr');
+          tr.innerHTML = `<td>${item.name}</td><td>${item.width}x${item.height}px</td><td>💰${item.priceGame} | 💵${item.priceReal}</td><td><button class="view-btn" style="background:#ef4444;" onclick="deleteCustomBuilding('${item._id}', this)">🗑️ Borrar</button></td>`;
+          tbody.appendChild(tr);
+        });
       }
     }
 
-    function closeAdminPanel() { document.getElementById('admin-panel').style.display = 'none'; }
+    async function deleteCustomBuilding(id, btn) {
+      if (!confirm("¿Eliminar este edificio del catálogo? Los jugadores ya no podrán usarlo.")) return;
+      btn.disabled = true;
+      btn.innerText = '...';
+      const res = await fetch(`/api/custom-buildings/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': 'Bearer ' + authToken }
+      }).then(r => r.json());
+      if (res.ok) {
+        // Quitar del array local también
+        customBuildings = customBuildings.filter(b => b._id !== id);
+        updateBuildingUI();
+        loadCustomBuildingsAdmin();
+      } else {
+        alert("Error al eliminar.");
+        btn.disabled = false;
+        btn.innerText = '🗑️ Borrar';
+      }
+    }
+
+    function closeAdminPanel() {
+      document.getElementById('admin-panel').style.display = 'none';
+      // Restaurar zoom en móvil
+      const zoom = document.getElementById('zoom-controls');
+      if (zoom && isMobileView) zoom.style.display = 'flex';
+    }
 
     window.viewSubmittedBase = function(index) {
       const subs = window._adminSubs || [];

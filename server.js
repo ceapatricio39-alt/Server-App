@@ -177,6 +177,14 @@ app.post('/api/custom-buildings', auth, dbCheck, async (req, res) => {
   res.json({ ok: true, item });
 });
 
+// ── DELETE /api/custom-buildings/:id (solo admin) ─
+app.delete('/api/custom-buildings/:id', auth, dbCheck, async (req, res) => {
+  if (!req.user.isAdmin)
+    return res.status(403).json({ error: 'Solo el admin puede eliminar edificios' });
+  await CustomBuilding.findByIdAndDelete(req.params.id);
+  res.json({ ok: true });
+});
+
 // ── Fallback → index.html ─────────────────────────
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
