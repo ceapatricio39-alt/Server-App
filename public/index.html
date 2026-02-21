@@ -1265,7 +1265,19 @@
     // ── API ───────────────────────────────────────────
     let authToken = null;
 
+    // Detecta si se está ejecutando como archivo local (sin servidor)
+    const IS_LOCAL = window.location.protocol === 'file:';
+
+    // Cuentas de prueba para modo local
+    const LOCAL_ACCOUNTS = {
+      'test':      { password: 'test',      isAdmin: false },
+      'testadmin': { password: 'testadmin', isAdmin: true  }
+    };
+    let _localBuilds = {};
+    let _localCustomBuildings = [];
+
     async function apiPost(url, body) {
+      if (IS_LOCAL) return handleLocalPost(url, body);
       const res = await fetch(url, {
         method: 'POST',
         headers: {
@@ -1278,10 +1290,52 @@
     }
 
     async function apiGet(url) {
+      if (IS_LOCAL) return handleLocalGet(url);
       const res = await fetch(url, {
         headers: authToken ? { 'Authorization': 'Bearer ' + authToken } : {}
       });
       return res.json();
+    }
+
+    function handleLocalPost(url, body) {
+      if (url === '/api/login') {
+        const acc = LOCAL_ACCOUNTS[body.username];
+        if (acc && acc.password === body.password) {
+          authToken = 'local-token';
+          return { token: 'local-token', username: body.username, isAdmin: acc.isAdmin };
+        }
+        return { error: 'Credenciales incorrectas' };
+      }
+      if (url === '/api/register') {
+        if (LOCAL_ACCOUNTS[body.username]) return { error: 'Ese usuario ya existe' };
+        LOCAL_ACCOUNTS[body.username] = { password: body.password, isAdmin: false };
+        return { ok: true };
+      }
+      if (url === '/api/build/save') {
+        _localBuilds[currentUser] = body.data;
+        return { ok: true };
+      }
+      if (url === '/api/submit') {
+        return { ok: true };
+      }
+      if (url === '/api/custom-buildings') {
+        _localCustomBuildings.push(body);
+        return { ok: true };
+      }
+      return { error: 'No disponible en modo local' };
+    }
+
+    function handleLocalGet(url) {
+      if (url === '/api/build/load') {
+        return _localBuilds[currentUser] || null;
+      }
+      if (url === '/api/submissions') {
+        return [];
+      }
+      if (url === '/api/custom-buildings') {
+        return _localCustomBuildings;
+      }
+      return null;
     }
     // ─────────────────────────────────────────────────
 
@@ -1334,6 +1388,8 @@
           const el = document.getElementById(id);
           if (el) el.style.display = 'block';
         });
+        // El menú empieza abierto — ocultar zoom desde el inicio en móvil
+        if (isMobileView) document.getElementById('zoom-controls').classList.add('zoom-hidden');
       }
 
       // Cargar edificios personalizados del servidor para todos los usuarios
@@ -1442,9 +1498,7 @@
       const tbody = document.getElementById('admin-tbody');
       tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Cargando...</td></tr>';
       document.getElementById('admin-panel').style.display = 'flex';
-
-      // Ocultar zoom en móvil con clase CSS (evita que !important lo sobreescriba)
-      if (isMobileView) document.getElementById('zoom-controls').classList.add('zoom-hidden');
+      // No tocar zoom-hidden aquí — ya lo gestiona togglePalette
 
       const subs = await apiGet('/api/submissions');
       tbody.innerHTML = '';
@@ -1501,8 +1555,11 @@
 
     function closeAdminPanel() {
       document.getElementById('admin-panel').style.display = 'none';
-      // Restaurar zoom en móvil
-      if (isMobileView) document.getElementById('zoom-controls').classList.remove('zoom-hidden');
+      // Restaurar zoom solo si el menú de sistema está abierto (y es admin en móvil)
+      if (isAdmin && isMobileView) {
+        const paletteOpen = !document.getElementById('system-palette-content').classList.contains('hidden');
+        document.getElementById('zoom-controls').classList.toggle('zoom-hidden', paletteOpen);
+      }
     }
 
     window.viewSubmittedBase = function(index) {
@@ -1599,7 +1656,14 @@
       }
     }
 
-    function togglePalette(id) { document.getElementById(id).classList.toggle('hidden'); }
+    function togglePalette(id) {
+      document.getElementById(id).classList.toggle('hidden');
+      // Solo en móvil y solo para admin: ocultar zoom cuando se abre el menú de sistema
+      if (id === 'system-palette-content' && isAdmin && isMobileView) {
+        const paletteOpen = !document.getElementById(id).classList.contains('hidden');
+        document.getElementById('zoom-controls').classList.toggle('zoom-hidden', paletteOpen);
+      }
+    }
 
     function toggleMobileSelector() {
       document.getElementById('selector-container').classList.toggle('collapsed');
@@ -1661,12 +1725,12 @@
 
     let touchState = 'idle';
 
-    viewport.addEventListener("touchstart", function(e) {
+    document.addEventListener("touchstart", function(e) {
       if (!isMobileView) return;
 
-      if (e.target.closest('#construction-tools, #system-tools, #zoom-controls, #ui, button, #confirm-place-btn')) return;
-
+      // Pinch zoom siempre tiene prioridad, incluso si un dedo toca el UI
       if (e.touches.length >= 2) {
+        e.preventDefault();
         touchState = 'pinching';
         isPanning = false;
         cancelWallTap();
@@ -1677,6 +1741,8 @@
         initialZoom = currentZoom;
         return;
       }
+
+      if (e.target.closest('#construction-tools, #system-tools, #zoom-controls, #ui, button, #confirm-place-btn')) return;
 
       const touch = e.touches[0];
 
@@ -1717,11 +1783,9 @@
     function moveMobilePreview(clientX, clientY) {
       if (!selectedType || selectedType.isVariable) return;
 
-      const touchOffset = 50;
-      let x = (clientX - panX) / currentZoom - selectedType.width / 2;
-      let y = (clientY - panY) / currentZoom - selectedType.height / 2 - touchOffset / currentZoom;
-
-      if (gridEnabled) { x = snap(x); y = snap(y); }
+      // Convertir posición del dedo a coordenadas del mapa
+      const mapX = (clientX - panX) / currentZoom;
+      const mapY = (clientY - panY) / currentZoom;
 
       if (!preview) {
         preview = document.createElement("div");
@@ -1740,6 +1804,12 @@
       }
 
       const size = getStyleSize(preview);
+
+      // Centrar exactamente en el dedo
+      let x = mapX - size.w / 2;
+      let y = mapY - size.h / 2;
+
+      if (gridEnabled) { x = snap(x); y = snap(y); }
 
       preview.style.left = x + "px";
       preview.style.top = y + "px";
@@ -1796,9 +1866,9 @@
     }
 
     viewport.addEventListener("mousemove", handleMove);
-    viewport.addEventListener("touchmove", function(e) {
+    document.addEventListener("touchmove", function(e) {
       if (!isMobileView) return;
-      e.preventDefault();
+      if (touchState === 'pinching') e.preventDefault();
 
       if (e.touches.length === 2 && touchState === 'pinching') {
         const currentDistance = Math.hypot(
