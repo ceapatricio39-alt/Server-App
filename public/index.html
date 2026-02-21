@@ -117,7 +117,7 @@
       box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
     }
 
-    button:hover {
+    body.is-pc button:hover {
       background: var(--accent-hover);
       transform: translateY(-2px);
       box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
@@ -132,7 +132,7 @@
       color: var(--text-main);
     }
 
-    button.outline:hover {
+    body.is-pc button.outline:hover {
       background: rgba(255, 255, 255, 0.05);
       border-color: rgba(255, 255, 255, 0.2);
     }
@@ -669,7 +669,7 @@
       position: relative;
     }
 
-    .circle-btn:hover {
+    body.is-pc .circle-btn:hover {
       background: var(--accent-color);
       transform: scale(1.1);
       box-shadow: 0 12px 40px rgba(99, 102, 241, 0.4);
@@ -709,6 +709,9 @@
       border-color: #fff;
       box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.5), 0 8px 24px rgba(99, 102, 241, 0.6);
     }
+
+    .circle-btn:focus { outline: none; }
+    .circle-btn:focus:not(.active) { background: var(--bg-elevated); border-color: var(--border-color); box-shadow: none; }
 
     #mobile-actions {
       position: fixed;
@@ -853,7 +856,7 @@
     <button class="outline pc-only" onclick="toggleGrid()">Alternar Cuadrícula</button>
 
     <div class="tool-group pc-only">
-      <button class="outline tool-btn active" id="pc-btn-build" onclick="setMode('build')">🔨 Construir</button>
+      <button class="outline tool-btn" id="pc-btn-build" onclick="setMode('build')">🔨 Construir</button>
       <button class="outline tool-btn" id="pc-btn-move" onclick="setMode('move')">✋ Mover</button>
       <button class="outline tool-btn" id="pc-btn-delete" onclick="setMode('delete')">🗑️ Borrar</button>
       <button class="outline tool-btn" onclick="undoLastAction()">↩️ Deshacer</button>
@@ -871,7 +874,7 @@
 
   <div id="construction-tools" class="floating-palette mobile-only">
     <div id="build-palette-content" class="palette-content">
-      <button class="circle-btn active" id="btn-build" onclick="setMode('build')" title="Construir (B)">🔨</button>
+      <button class="circle-btn" id="btn-build" onclick="setMode('build')" title="Construir (B)">🔨</button>
       <button class="circle-btn" id="btn-move" onclick="setMode('move')" title="Mover (M)">✋</button>
       <button class="circle-btn" id="btn-delete" onclick="setMode('delete')" title="Borrar (D)">🗑️</button>
       <button class="circle-btn" id="btn-rotate" title="Rotar (R)">🔄</button>
@@ -1388,9 +1391,13 @@
           const el = document.getElementById(id);
           if (el) el.style.display = 'block';
         });
-        // El menú empieza abierto — ocultar zoom desde el inicio en móvil
-        if (isMobileView) document.getElementById('zoom-controls').classList.add('zoom-hidden');
       }
+
+      // Activar modo build por defecto al entrar
+      setMode('build');
+
+      // Ocultar zoom en móvil si es admin (el menú empieza abierto)
+      if (isAdmin && isMobileView) document.getElementById('zoom-controls').classList.add('zoom-hidden');
 
       // Cargar edificios personalizados del servidor para todos los usuarios
       apiGet('/api/custom-buildings').then(data => {
@@ -1630,7 +1637,10 @@
       const pcBtnDelete = document.getElementById("pc-btn-delete");
       const pcBtnMove = document.getElementById("pc-btn-move");
 
-      [btnBuild, btnDelete, btnMove, pcBtnBuild, pcBtnDelete, pcBtnMove].filter(b => b).forEach(b => b.classList.remove("active"));
+      [btnBuild, btnDelete, btnMove, pcBtnBuild, pcBtnDelete, pcBtnMove].filter(b => b).forEach(b => {
+        b.classList.remove("active");
+        b.blur(); // quitar foco para que no quede el color residual
+      });
 
       if (currentMode === 'build') { if (btnBuild) btnBuild.classList.add("active"); if (pcBtnBuild) pcBtnBuild.classList.add("active"); }
       if (currentMode === 'delete') { if (btnDelete) btnDelete.classList.add("active"); if (pcBtnDelete) pcBtnDelete.classList.add("active"); }
@@ -1736,17 +1746,21 @@
     document.addEventListener("touchstart", function(e) {
       if (!isMobileView) return;
 
-      // Pinch zoom siempre tiene prioridad, incluso si un dedo toca el UI
-      if (e.touches.length >= 2) {
+      console.log('touchstart fingers:', e.touches.length, 'mode:', currentMode, 'state:', touchState);
+
+      // Segundo dedo en modo none — interrumpir panning e iniciar pinch
+      if (e.touches.length >= 2 && currentMode === 'none') {
         e.preventDefault();
-        touchState = 'pinching';
         isPanning = false;
+        touchState = 'pinching';
+        viewport.style.cursor = 'crosshair';
         cancelWallTap();
         initialPinchDistance = Math.hypot(
           e.touches[0].clientX - e.touches[1].clientX,
           e.touches[0].clientY - e.touches[1].clientY
         );
         initialZoom = currentZoom;
+        console.log('PINCH STARTED dist:', initialPinchDistance);
         return;
       }
 
@@ -1878,7 +1892,19 @@
       if (!isMobileView) return;
       if (touchState === 'pinching') e.preventDefault();
 
-      if (e.touches.length === 2 && touchState === 'pinching') {
+      if (e.touches.length === 2 && currentMode === 'none') {
+        console.log('touchmove 2 fingers, state:', touchState);
+        // Si el segundo dedo llega mientras paneas en modo none, cambiar a pinch
+        if (touchState !== 'pinching') {
+          touchState = 'pinching';
+          isPanning = false;
+          initialPinchDistance = Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY
+          );
+          initialZoom = currentZoom;
+        }
+        e.preventDefault();
         const currentDistance = Math.hypot(
           e.touches[0].clientX - e.touches[1].clientX,
           e.touches[0].clientY - e.touches[1].clientY
